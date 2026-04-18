@@ -310,20 +310,12 @@ def _read_telemetry(cdmc: str, channel: int) -> list[dict]:
 
 def _build_batch_lookup_params(batch_id: str) -> list[tuple]:
     candidates = [batch_id]
-    if isinstance(batch_id, str) and re.fullmatch(r"\d+", batch_id):
+    if re.fullmatch(r"\d+", batch_id):
         try:
             candidates.append(int(batch_id))
         except ValueError:
             pass
-    seen = set()
-    params = []
-    for value in candidates:
-        marker = (type(value), value)
-        if marker in seen:
-            continue
-        seen.add(marker)
-        params.append((value,))
-    return params
+    return [(value,) for value in candidates]
 
 
 @app.get("/")
