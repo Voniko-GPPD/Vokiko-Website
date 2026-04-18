@@ -42,7 +42,15 @@ function getStationUrl(stationId, res) {
   return url;
 }
 
-// Helper: handle proxy errors uniformly
+/**
+ * Unified proxy error handler for DMP station routes.
+ * - Forwards HTTP error responses from the station as-is.
+ * - Returns 503 when the station is unreachable (network/timeout error).
+ * - Delegates unexpected errors to Express's next() handler.
+ * @param {Error} err - Axios error
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
 function handleProxyError(err, res, next) {
   if (err.response) return res.status(err.response.status).json(err.response.data);
   if (err.request) return res.status(503).json({ error: 'DMP station unreachable' });
