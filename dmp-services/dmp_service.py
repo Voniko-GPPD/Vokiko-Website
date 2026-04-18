@@ -152,7 +152,12 @@ def _inline_params(sql: str, params: tuple) -> str:
         elif isinstance(param, (int, float)):
             result += str(param)
         else:
-            escaped = str(param).replace("'", "''")
+            value = str(param)
+            # Permit only a conservative character set used by batch/cdmc identifiers
+            # and date-like strings when fallback inlining is required by Access ODBC.
+            if not re.fullmatch(r"[A-Za-z0-9 _:\.\-]+", value):
+                raise ValueError("Unsafe string parameter for inline SQL fallback")
+            escaped = value.replace("'", "''")
             result += f"'{escaped}'"
         result += parts[i + 1]
     return result
@@ -175,8 +180,13 @@ def query_mdb(mdb_path: str, sql: str, params: tuple = ()) -> list[dict]:
                 # fall back to safely inlined parameters.
                 try:
                     cursor.execute(_inline_params(sql, params))
-                except pyodbc.Error:
-                    raise exc
+                except (pyodbc.Error, ValueError) as inline_exc:
+                    logger.warning(
+                        "Inline parameter fallback failed (%s); re-raising original execute error (%s)",
+                        inline_exc,
+                        exc,
+                    )
+                    raise exc from inline_exc
             else:
                 raise
         columns = [col[0] for col in cursor.description] if cursor.description else []
