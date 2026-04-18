@@ -42,6 +42,13 @@ function getStationUrl(stationId, res) {
   return url;
 }
 
+// Helper: handle proxy errors uniformly
+function handleProxyError(err, res, next) {
+  if (err.response) return res.status(err.response.status).json(err.response.data);
+  if (err.request) return res.status(503).json({ error: 'DMP station unreachable' });
+  next(err);
+}
+
 // GET /api/dmp/batches?stationId=
 router.get('/batches', authenticateToken, async (req, res, next) => {
   const stationUrl = getStationUrl(req.query.stationId, res);
@@ -50,8 +57,7 @@ router.get('/batches', authenticateToken, async (req, res, next) => {
     const r = await axios.get(`${stationUrl}/batches`, { timeout: 30000 });
     res.json(r.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status).json(err.response.data);
-    next(err);
+    handleProxyError(err, res, next);
   }
 });
 
@@ -63,8 +69,7 @@ router.get('/batches/:batchId/channels', authenticateToken, async (req, res, nex
     const r = await axios.get(`${stationUrl}/batches/${encodeURIComponent(req.params.batchId)}/channels`, { timeout: 30000 });
     res.json(r.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status).json(err.response.data);
-    next(err);
+    handleProxyError(err, res, next);
   }
 });
 
@@ -79,8 +84,7 @@ router.get('/telemetry', authenticateToken, async (req, res, next) => {
     });
     res.json(r.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status).json(err.response.data);
-    next(err);
+    handleProxyError(err, res, next);
   }
 });
 
@@ -95,8 +99,7 @@ router.get('/changes', authenticateToken, async (req, res, next) => {
     });
     res.json(r.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status).json(err.response.data);
-    next(err);
+    handleProxyError(err, res, next);
   }
 });
 
@@ -111,8 +114,7 @@ router.get('/stats', authenticateToken, async (req, res, next) => {
     });
     res.json(r.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status).json(err.response.data);
-    next(err);
+    handleProxyError(err, res, next);
   }
 });
 
@@ -124,8 +126,7 @@ router.get('/templates', authenticateToken, async (req, res, next) => {
     const r = await axios.get(`${stationUrl}/templates`, { timeout: 15000 });
     res.json(r.data);
   } catch (err) {
-    if (err.response) return res.status(err.response.status).json(err.response.data);
-    next(err);
+    handleProxyError(err, res, next);
   }
 });
 
@@ -152,8 +153,10 @@ router.post('/report', authenticateToken, async (req, res, next) => {
         return res.status(err.response.status).send(msg);
       }
     }
+    if (err.request) return res.status(503).json({ error: 'DMP station unreachable' });
     next(err);
   }
 });
 
 module.exports = router;
+
