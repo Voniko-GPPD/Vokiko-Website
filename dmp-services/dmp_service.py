@@ -130,9 +130,15 @@ def compute_stats(rows: list[dict]) -> dict:
         except (TypeError, ValueError):
             return None
 
-    volt_vals = [safe_float(r.get("VOLT")) for r in rows]
+    def get_value(row: dict, *keys):
+        for key in keys:
+            if key in row and row.get(key) is not None:
+                return row.get(key)
+        return None
+
+    volt_vals = [safe_float(get_value(r, "VOLT", "volt", "Volt")) for r in rows]
     volt_vals = [v for v in volt_vals if v is not None]
-    im_vals = [safe_float(r.get("Im")) for r in rows]
+    im_vals = [safe_float(get_value(r, "Im", "IM", "im")) for r in rows]
     im_vals = [i for i in im_vals if i is not None]
 
     def agg(vals):
@@ -264,13 +270,21 @@ def health_check():
 
 @app.get("/batches")
 def get_batches():
-    rows = _read_dmpdata("SELECT id, dcxh, fdrq, fdfs FROM para_pub ORDER BY fdrq DESC")
+    rows = _read_dmpdata("SELECT cdmc, dcxh, fdrq, fdfs FROM para_pub ORDER BY fdrq DESC")
+    for row in rows:
+        fdrq = row.get("fdrq")
+        if fdrq is None:
+            continue
+        if hasattr(fdrq, "strftime"):
+            row["fdrq"] = fdrq.strftime("%Y-%m-%d")
+        else:
+            row["fdrq"] = str(fdrq)[:10]
     return {"batches": rows}
 
 
 @app.get("/batches/{batch_id}/channels")
 def get_channels(batch_id: str):
-    rows = _read_dmpdata("SELECT baty, cdmc FROM para_singl WHERE id=?", (batch_id,))
+    rows = _read_dmpdata("SELECT baty, cdmc FROM para_singl WHERE cdmc=?", (batch_id,))
     return {"channels": rows}
 
 
@@ -297,7 +311,7 @@ def get_templates():
 @app.post("/report")
 def generate_report(payload: ReportRequest):
     batch_rows = _read_dmpdata(
-        "SELECT id, dcxh, fdrq, fdfs FROM para_pub WHERE id=?",
+        "SELECT cdmc, dcxh, fdrq, fdfs FROM para_pub WHERE cdmc=?",
         (payload.batch_id,),
     )
     if not batch_rows:
@@ -308,7 +322,7 @@ def generate_report(payload: ReportRequest):
     batch = batch_rows[0]
 
     context = {
-        "BATCH_ID": batch.get("id"),
+        "BATCH_ID": batch.get("cdmc"),
         "MODEL": batch.get("dcxh"),
         "DATE": str(batch.get("fdrq")),
         "DISCHARGE_PATTERN": batch.get("fdfs"),

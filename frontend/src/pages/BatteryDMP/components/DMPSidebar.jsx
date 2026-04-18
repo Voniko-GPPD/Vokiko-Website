@@ -25,30 +25,30 @@ function buildBatchTree(batches, channelsByBatch, labels) {
       title: date,
       selectable: false,
       children: modelBatches.map((batch) => {
-        const batchKey = `batch:${batch.id}`;
-        const channels = channelsByBatch[batch.id] || [];
+        const batchKey = `batch:${batch.cdmc}`;
+        const channels = channelsByBatch[batch.cdmc] || [];
         return {
           key: batchKey,
-          title: `${labels.batch} ${batch.id}`,
+          title: `${labels.batch} ${batch.cdmc}`,
           selectable: false,
-          batchId: batch.id,
+          batchId: batch.cdmc,
           model,
           date,
           children: channels.length
             ? channels.map((channel) => ({
-              key: `channel:${batch.id}:${channel.baty}`,
+              key: `channel:${batch.cdmc}:${channel.baty}`,
               title: `${labels.channel} ${channel.baty}`,
               isLeaf: true,
               selectable: true,
               selection: {
-                batchId: batch.id,
+                batchId: batch.cdmc,
                 cdmc: channel.cdmc,
                 channel: channel.baty,
                 model,
                 date,
               },
             }))
-            : [{ key: `placeholder:${batch.id}`, title: labels.clickToLoad, selectable: false, disabled: true }],
+            : [{ key: `placeholder:${batch.cdmc}`, title: labels.clickToLoad, selectable: false, disabled: true }],
         };
       }),
     })),
