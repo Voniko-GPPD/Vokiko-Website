@@ -132,7 +132,9 @@ export default function DMPSidebar({ stationId, onSelect }) {
       try {
         const { changes, timestamp } = await fetchChanges(stationId, since);
         since = timestamp;
-        if (!active || !changes.length) return;
+        if (!active) return;
+        setError('');
+        if (!changes.length) return;
         const updatedBatches = await fetchBatches(stationId);
         if (!active) return;
         setBatches(updatedBatches);
@@ -143,9 +145,8 @@ export default function DMPSidebar({ stationId, onSelect }) {
           );
         });
       } catch (err) {
-        if (import.meta.env.DEV) {
-          console.debug('DMP changes polling failed', err);
-        }
+        if (!active) return;
+        setError(err.message || 'Connection to DMP station failed');
       }
     };
 

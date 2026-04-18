@@ -94,14 +94,16 @@ function getStations() {
 
 /**
  * Resolve the base URL for a given stationId.
- * Returns null if stationId is unknown.
+ * Returns null if stationId is unknown or the station is offline.
  * @param {string|null|undefined} stationId
  * @returns {string|null}
  */
 function resolveUrl(stationId) {
   if (!stationId) return null;
   const s = registry.get(stationId);
-  return s ? s.url : null;
+  if (!s) return null;
+  if (Date.now() - s.lastSeen >= OFFLINE_TIMEOUT_MS) return null;
+  return s.url;
 }
 
 // Load persisted data on module initialisation
