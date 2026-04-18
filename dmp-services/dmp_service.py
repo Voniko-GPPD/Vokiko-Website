@@ -139,6 +139,24 @@ def shadow_copy(mdb_path: str):
             pass
 
 
+def _inline_params(sql: str, params: tuple) -> str:
+    """Inline params into SQL for Access ODBC drivers that don't support SQLBindParameter."""
+    parts = sql.split("?")
+    if len(parts) != len(params) + 1:
+        raise ValueError("Parameter count mismatch")
+    result = parts[0]
+    for i, param in enumerate(params):
+        if param is None:
+            result += "NULL"
+        elif isinstance(param, (int, float)):
+            result += str(param)
+        else:
+            escaped = str(param).replace("'", "''")
+            result += f"'{escaped}'"
+        result += parts[i + 1]
+    return result
+
+
 def query_mdb(mdb_path: str, sql: str, params: tuple = ()) -> list[dict]:
     conn_str = (
         r"Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
@@ -146,7 +164,16 @@ def query_mdb(mdb_path: str, sql: str, params: tuple = ()) -> list[dict]:
     )
     with pyodbc.connect(conn_str) as conn:
         cursor = conn.cursor()
-        cursor.execute(sql, params)
+        try:
+            cursor.execute(sql, params) if params else cursor.execute(sql)
+        except pyodbc.Error as exc:
+            err_str = str(exc)
+            if params and ("HYC00" in err_str or "SQLBindParameter" in err_str):
+                # MS Access ODBC driver doesn't support bound string parameters;
+                # fall back to safely inlined parameters.
+                cursor.execute(_inline_params(sql, params))
+            else:
+                raise
         columns = [col[0] for col in cursor.description] if cursor.description else []
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
