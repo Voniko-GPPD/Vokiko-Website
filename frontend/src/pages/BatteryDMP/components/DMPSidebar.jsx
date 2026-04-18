@@ -136,9 +136,14 @@ export default function DMPSidebar({ stationId, onSelect }) {
         const updatedBatches = await fetchBatches(stationId);
         if (!active) return;
         setBatches(updatedBatches);
-      } catch (_) {}
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.debug('DMP changes polling failed', err);
+        }
+      }
     };
 
+    pollChanges();
     const intervalId = setInterval(pollChanges, 10000);
     return () => {
       active = false;

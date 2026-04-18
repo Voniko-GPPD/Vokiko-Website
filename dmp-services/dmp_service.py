@@ -84,6 +84,9 @@ def _watch_dmp_changes_loop() -> None:
         current = _scan_dynamic_mdb_files()
         now = time.time()
         with _WATCH_LOCK:
+            deleted_stems = set(_WATCHED_MDB_MTIME.keys()) - set(current.keys())
+            for stem in deleted_stems:
+                _WATCHED_CHANGES.pop(stem, None)
             for stem, mtime in current.items():
                 previous = _WATCHED_MDB_MTIME.get(stem)
                 if previous is None or mtime > previous:
