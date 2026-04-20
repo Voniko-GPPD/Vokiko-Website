@@ -549,7 +549,8 @@ def get_batches():
         try:
             rows = _read_dmpdata("SELECT id, dcxh, fdrq, fdfs FROM para_pub ORDER BY fdrq DESC")
         except pyodbc.Error as exc:
-            raise HTTPException(status_code=500, detail=f"Database query failed: {exc}") from exc
+            logger.error("get_batches: fallback query also failed: %s", exc)
+            raise HTTPException(status_code=500, detail="Database query failed") from exc
     for row in rows:
         fdrq = row.get("fdrq")
         if fdrq is None:

@@ -15,6 +15,7 @@ import { fetchTelemetry } from '../../../api/dmpApi';
 import { useLang } from '../../../contexts/LangContext';
 
 const statsKeys = ['VOLT_MAX', 'VOLT_MIN', 'VOLT_AVG', 'IM_MAX', 'IM_MIN', 'IM_AVG'];
+const STATS_PRECISION = 10000;
 
 function safeNum(val) {
   if (val === null || val === undefined || val === '--' || val === '') return null;
@@ -31,9 +32,9 @@ function computeStats(telemetry) {
     if (!arr.length) return { max: null, min: null, avg: null };
     const sum = arr.reduce((a, b) => a + b, 0);
     return {
-      max: Math.round(Math.max(...arr) * 10000) / 10000,
-      min: Math.round(Math.min(...arr) * 10000) / 10000,
-      avg: Math.round((sum / arr.length) * 10000) / 10000,
+      max: Math.round(Math.max(...arr) * STATS_PRECISION) / STATS_PRECISION,
+      min: Math.round(Math.min(...arr) * STATS_PRECISION) / STATS_PRECISION,
+      avg: Math.round((sum / arr.length) * STATS_PRECISION) / STATS_PRECISION,
     };
   };
 
