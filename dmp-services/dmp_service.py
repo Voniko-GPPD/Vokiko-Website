@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import re
 import shutil
@@ -223,7 +224,7 @@ def compute_stats(rows: list[dict]) -> dict:
             return None
         try:
             f = float(value)
-            return f if f == f else None
+            return None if math.isnan(f) else f
         except (TypeError, ValueError):
             return None
 
