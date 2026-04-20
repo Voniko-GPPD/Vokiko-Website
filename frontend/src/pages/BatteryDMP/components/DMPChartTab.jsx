@@ -50,36 +50,34 @@ export default function DMPChartTab({ stationId, selection }) {
       return;
     }
 
-    let mounted = true;
+    const abortController = new AbortController();
     setLoading(true);
     setError('');
 
-    fetchTelemetry(stationId, selection.cdmc, selection.channel)
+    fetchTelemetry(stationId, selection.cdmc, selection.channel, abortController.signal)
       .then((rows) => {
-        if (!mounted) return;
         setTelemetry(rows);
       })
       .catch((err) => {
-        if (!mounted) return;
+        if (err.name === 'AbortError') return;
         setError(err.message || 'Failed to load telemetry data');
       })
       .finally(() => {
-        if (!mounted) return;
+        if (abortController.signal.aborted) return;
         setLoading(false);
       });
 
-    fetchStats(stationId, selection.cdmc, selection.channel)
+    fetchStats(stationId, selection.cdmc, selection.channel, abortController.signal)
       .then((data) => {
-        if (!mounted) return;
         setStats(data || {});
       })
-      .catch(() => {
-        if (!mounted) return;
+      .catch((err) => {
+        if (err.name === 'AbortError') return;
         setStats({});
       });
 
     return () => {
-      mounted = false;
+      abortController.abort();
     };
   }, [stationId, selection, t]);
 

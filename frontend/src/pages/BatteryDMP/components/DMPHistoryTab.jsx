@@ -36,26 +36,25 @@ export default function DMPHistoryTab({ stationId, selection }) {
       return;
     }
 
-    let mounted = true;
+    const abortController = new AbortController();
     setLoading(true);
     setError('');
 
-    fetchTelemetry(stationId, selection.cdmc, selection.channel)
+    fetchTelemetry(stationId, selection.cdmc, selection.channel, abortController.signal)
       .then((rows) => {
-        if (!mounted) return;
         setTelemetry(rows);
       })
       .catch((err) => {
-        if (!mounted) return;
+        if (err.name === 'AbortError') return;
         setError(err.message || 'Failed to load telemetry');
       })
       .finally(() => {
-        if (!mounted) return;
+        if (abortController.signal.aborted) return;
         setLoading(false);
       });
 
     return () => {
-      mounted = false;
+      abortController.abort();
     };
   }, [stationId, selection]);
 

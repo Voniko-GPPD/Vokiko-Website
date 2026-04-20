@@ -34,9 +34,9 @@ export async function fetchChannels(stationId, batchId) {
   return data.channels || [];
 }
 
-export async function fetchTelemetry(stationId, cdmc, channel) {
+export async function fetchTelemetry(stationId, cdmc, channel, signal) {
   const params = new URLSearchParams({ stationId, cdmc, channel });
-  const res = await apiFetch(`${BASE}/telemetry?${params.toString()}`);
+  const res = await apiFetch(`${BASE}/telemetry?${params.toString()}`, { signal });
   const data = await res.json();
   return data.telemetry || [];
 }
@@ -51,9 +51,9 @@ export async function fetchChanges(stationId, since) {
   };
 }
 
-export async function fetchStats(stationId, cdmc, channel) {
+export async function fetchStats(stationId, cdmc, channel, signal) {
   const params = new URLSearchParams({ stationId, cdmc, channel });
-  const res = await apiFetch(`${BASE}/stats?${params.toString()}`);
+  const res = await apiFetch(`${BASE}/stats?${params.toString()}`, { signal });
   return res.json();
 }
 
