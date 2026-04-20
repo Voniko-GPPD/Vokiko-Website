@@ -29,7 +29,7 @@ DMP_TEMPLATES_DIR: str = os.environ.get("DMP_TEMPLATES_DIR", "./dmp_templates")
 WATCH_INTERVAL_SECONDS: int = 5
 
 _WATCH_LOCK = threading.Lock()
-_ACCESS_QUERY_LOCK = threading.Lock()
+_ACCESS_QUERY_LOCK = threading.Semaphore(2)
 _TELEMETRY_CACHE: dict[tuple, tuple[list, float]] = {}
 _TELEMETRY_CACHE_TTL: float = 60.0  # seconds
 _WATCHED_MDB_MTIME: dict[str, float] = {}
@@ -168,38 +168,48 @@ def _inline_params(sql: str, params: tuple) -> str:
     return result
 
 
-def query_mdb(mdb_path: str, sql: str, params: tuple = ()) -> list[dict]:
-    with _ACCESS_QUERY_LOCK:
-        conn_str = (
-            r"Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
-            f"DBQ={mdb_path};"
-        )
-        with pyodbc.connect(conn_str) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute(sql, params) if params else cursor.execute(sql)
-            except pyodbc.Error as exc:
-                err_str = str(exc)
-                if params and ("HYC00" in err_str or "SQLBindParameter" in err_str or "07002" in err_str):
-                    # MS Access ODBC driver doesn't support bound string parameters;
-                    # (errors: HYC00, SQLBindParameter, or sometimes 07002)
-                    # fall back to safely inlined parameters on a fresh cursor — the
-                    # original cursor's statement handle is invalid after HYC00 and
-                    # cannot be reused for another execute() call.
+def query_mdb(mdb_path: str, sql: str, params: tuple = (), retries: int = 2) -> list[dict]:
+    """Run an Access query with bounded concurrency and short HY000 retries.
+
+    Retries are only applied to transient HY000 driver errors using a linear
+    backoff of 0.3s * attempt and preserve existing HYC00 inline fallback.
+    """
+    conn_str = (
+        r"Driver={Microsoft Access Driver (*.mdb, *.accdb)};"
+        f"DBQ={mdb_path};"
+    )
+    for attempt_num in range(1, retries + 2):
+        try:
+            with _ACCESS_QUERY_LOCK:
+                with pyodbc.connect(conn_str) as conn:
+                    cursor = conn.cursor()
                     try:
-                        cursor = conn.cursor()
-                        cursor.execute(_inline_params(sql, params))
-                    except (pyodbc.Error, ValueError) as inline_exc:
-                        logger.warning(
-                            "Inline parameter fallback failed (%s); re-raising original execute error (%s)",
-                            inline_exc,
-                            exc,
-                        )
-                        raise exc from inline_exc
-                else:
-                    raise
-            columns = [col[0] for col in cursor.description] if cursor.description else []
-            return [dict(zip(columns, row)) for row in cursor.fetchall()]
+                        cursor.execute(sql, params) if params else cursor.execute(sql)
+                    except pyodbc.Error as exc:
+                        err_str = str(exc)
+                        if params and ("HYC00" in err_str or "SQLBindParameter" in err_str or "07002" in err_str):
+                            try:
+                                cursor = conn.cursor()
+                                cursor.execute(_inline_params(sql, params))
+                            except (pyodbc.Error, ValueError) as inline_exc:
+                                logger.warning(
+                                    "Inline parameter fallback failed (%s); re-raising original execute error (%s)",
+                                    inline_exc,
+                                    exc,
+                                )
+                                raise exc from inline_exc
+                        else:
+                            raise
+                    columns = [col[0] for col in cursor.description] if cursor.description else []
+                    return [dict(zip(columns, row)) for row in cursor.fetchall()]
+        except pyodbc.Error as exc:
+            err_str = str(exc)
+            if "HY000" in err_str and attempt_num <= retries:
+                wait = 0.3 * attempt_num
+                logger.debug("HY000 on attempt %d, retrying in %.1fs: %s", attempt_num, wait, exc)
+                time.sleep(wait)
+                continue
+            raise
 
 
 def resolve_data_file(filename: str) -> str:

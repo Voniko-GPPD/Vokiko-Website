@@ -88,7 +88,7 @@ router.get('/telemetry', authenticateToken, async (req, res, next) => {
   try {
     const r = await axios.get(`${stationUrl}/telemetry`, {
       params: { cdmc: req.query.cdmc, channel: req.query.channel },
-      timeout: 30000,
+      timeout: 120000,
     });
     res.json(r.data);
   } catch (err) {
@@ -118,7 +118,7 @@ router.get('/stats', authenticateToken, async (req, res, next) => {
   try {
     const r = await axios.get(`${stationUrl}/stats`, {
       params: { cdmc: req.query.cdmc, channel: req.query.channel },
-      timeout: 30000,
+      timeout: 120000,
     });
     res.json(r.data);
   } catch (err) {
@@ -167,4 +167,3 @@ router.post('/report', authenticateToken, async (req, res, next) => {
 });
 
 module.exports = router;
-
