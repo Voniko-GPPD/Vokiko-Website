@@ -21,10 +21,10 @@ import { useLang } from '../../../contexts/LangContext';
 
 const thresholds = [1.40, 1.35, 1.30, 1.25, 1.20, 1.15, 1.10, 1.05, 1.00, 0.95, 0.90];
 const statItems = [
-  { key: 'VOLT_MAX', title: 'VOLT MAX' },
-  { key: 'VOLT_MIN', title: 'VOLT MIN' },
-  { key: 'VOLT_AVG', title: 'VOLT AVG' },
-  { key: 'DURATION_MIN', title: 'DURATION MIN' },
+  { key: 'VOLT_MAX', title: 'VOLT MAX', suffix: 'V' },
+  { key: 'VOLT_MIN', title: 'VOLT MIN', suffix: 'V' },
+  { key: 'VOLT_AVG', title: 'VOLT AVG', suffix: 'V' },
+  { key: 'DURATION_MIN', title: 'Duration', suffix: 'min' },
 ];
 
 function safeNum(value) {
@@ -57,7 +57,11 @@ export default function DM2000CurveTab({ stationId, selection, selectedBaty, onB
       try {
         const rows = await fetchDM2000Batteries(stationId, selection.archname);
         if (!active) return;
-        setBatteries((rows || []).map((value) => Number(value)).filter((value) => Number.isFinite(value)));
+        setBatteries(
+          (rows || [])
+            .map((row) => Number(row.baty ?? row.BATY ?? row.Baty))
+            .filter((value) => Number.isFinite(value) && value > 0),
+        );
       } catch (err) {
         if (!active) return;
         setError(err.message || 'Failed to load batteries');
@@ -92,11 +96,28 @@ export default function DM2000CurveTab({ stationId, selection, selectedBaty, onB
           selectedBaty > 0
             ? fetchDM2000Curve(stationId, selection.archname, selectedBaty)
             : fetchDM2000AverageCurve(stationId, selection.archname),
-          fetchDM2000Stats(stationId, selection.archname, selectedBaty),
+          selectedBaty > 0
+            ? fetchDM2000Stats(stationId, selection.archname, selectedBaty)
+            : Promise.resolve(null),
         ]);
         if (!active) return;
         setCurve(curveRows || []);
-        setStats(statsRows || {});
+        if (selectedBaty === 0) {
+          const voltVals = (curveRows || [])
+            .map((row) => safeNum(row.VOLT))
+            .filter((value) => value !== null);
+          const timVals = (curveRows || [])
+            .map((row) => safeNum(row.TIM))
+            .filter((value) => value !== null);
+          setStats(voltVals.length > 0 ? {
+            VOLT_MAX: Math.max(...voltVals),
+            VOLT_MIN: Math.min(...voltVals),
+            VOLT_AVG: voltVals.reduce((acc, value) => acc + value, 0) / voltVals.length,
+            DURATION_MIN: timVals.length > 0 ? Math.max(...timVals) : null,
+          } : {});
+        } else {
+          setStats(statsRows || {});
+        }
       } catch (err) {
         if (!active) return;
         setError(err.message || 'Failed to load curve data');
@@ -158,7 +179,11 @@ export default function DM2000CurveTab({ stationId, selection, selectedBaty, onB
         {statItems.map((item) => (
           <Col xs={24} sm={12} md={6} key={item.key}>
             <Card size="small" loading={statsLoading}>
-              <Statistic title={item.title} value={stats[item.key]} precision={4} />
+              <Statistic
+                title={item.title}
+                value={stats[item.key] != null ? Number(stats[item.key]).toFixed(4) : '-'}
+                suffix={item.suffix}
+              />
             </Card>
           </Col>
         ))}
