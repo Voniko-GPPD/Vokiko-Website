@@ -64,8 +64,8 @@ export default function DM2000DailyVoltTab({ stationId, selection, selectedBaty,
 
   const dataSource = useMemo(() => (rows || []).map((row, index) => ({
     key: `${index}`,
-    date: row.DATE || row.date,
-    voltage: safeNum(row.VOLT || row.voltage),
+    date: row.date || row.DATE || row.dat || row.DAT,
+    voltage: safeNum(row.volt || row.VOLT || row.voltage),
   })).filter((row) => row.date && row.voltage !== null), [rows]);
 
   if (!selection) {
