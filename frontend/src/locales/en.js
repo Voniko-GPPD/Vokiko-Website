@@ -550,4 +550,5 @@ export default {
   dm2000SelectAll: 'Select All',
   dm2000ClearAll: 'Clear All',
   dm2000SelectAtLeastOne: 'Please select at least one battery',
+  dm2000BatteryUnit: 'battery',
 };

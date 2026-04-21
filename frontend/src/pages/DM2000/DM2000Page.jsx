@@ -8,13 +8,16 @@ import DM2000DataTab from './components/DM2000DataTab';
 import DM2000DailyVoltTab from './components/DM2000DailyVoltTab';
 import DM2000ExportTab from './components/DM2000ExportTab';
 
+const SEARCH_TAB_KEY = 'search';
+const CURVE_TAB_KEY = 'curve';
+
 export default function DM2000Page() {
   const { t } = useLang();
   const [stations, setStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(undefined);
   const [stationError, setStationError] = useState('');
   const [selection, setSelection] = useState(null);
-  const [activeTab, setActiveTab] = useState('search');
+  const [activeTab, setActiveTab] = useState(SEARCH_TAB_KEY);
   const [selectedBaty, setSelectedBaty] = useState(0);
 
   useEffect(() => {
@@ -50,7 +53,7 @@ export default function DM2000Page() {
   const handleSelectArchive = (record) => {
     setSelection(record);
     if (record?.archname) {
-      setActiveTab('curve');
+      setActiveTab(CURVE_TAB_KEY);
     }
   };
 
@@ -106,7 +109,7 @@ export default function DM2000Page() {
         destroyInactiveTabPane
         items={[
           {
-            key: 'search',
+            key: SEARCH_TAB_KEY,
             label: t('dm2000SearchTab'),
             children: (
               <DM2000FilterPanel
@@ -117,7 +120,7 @@ export default function DM2000Page() {
             ),
           },
           {
-            key: 'curve',
+              key: CURVE_TAB_KEY,
             label: t('dm2000CurveTab'),
             children: (
               <DM2000CurveTab

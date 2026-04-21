@@ -550,4 +550,5 @@ export default {
   dm2000SelectAll: 'Chọn tất cả',
   dm2000ClearAll: 'Bỏ chọn tất cả',
   dm2000SelectAtLeastOne: 'Vui lòng chọn ít nhất một pin',
+  dm2000BatteryUnit: 'pin',
 };

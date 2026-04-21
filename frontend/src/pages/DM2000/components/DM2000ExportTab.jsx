@@ -146,7 +146,7 @@ export default function DM2000ExportTab({ stationId, selection }) {
         loading={downloading}
         disabled={!stationId || !selection?.archname || !templateName || exportBatys.length === 0}
       >
-        {`${t('dm2000DownloadReport')} (${exportBatys.length} pin)`}
+        {`${t('dm2000DownloadReport')} (${exportBatys.length} ${t('dm2000BatteryUnit')})`}
       </Button>
     </Space>
   );
