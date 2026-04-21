@@ -546,4 +546,9 @@ export default {
   dm2000MadeDate: 'Made Date',
   dm2000SerialNo: 'Serial No.',
   dm2000Remarks: 'Remarks',
+  dm2000SearchTab: 'Load Data',
+  dm2000SelectAll: 'Select All',
+  dm2000ClearAll: 'Clear All',
+  dm2000SelectAtLeastOne: 'Please select at least one battery',
+  dm2000BatteryUnit: 'battery',
 };

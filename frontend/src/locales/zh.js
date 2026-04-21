@@ -546,4 +546,9 @@ export default {
   dm2000MadeDate: '生产日期',
   dm2000SerialNo: '序列号',
   dm2000Remarks: '备注',
+  dm2000SearchTab: '加载数据',
+  dm2000SelectAll: '全选',
+  dm2000ClearAll: '清空选择',
+  dm2000SelectAtLeastOne: '请至少选择一个电池',
+  dm2000BatteryUnit: '电池',
 };

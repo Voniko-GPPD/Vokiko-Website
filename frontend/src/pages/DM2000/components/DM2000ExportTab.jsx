@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Card, Descriptions, Empty, Radio, Space, Spin, notification } from 'antd';
+import { Alert, Button, Card, Checkbox, Descriptions, Empty, Radio, Space, Spin, notification } from 'antd';
 import { downloadDM2000Report, fetchDM2000Templates } from '../../../api/dm2000Api';
 import { useLang } from '../../../contexts/LangContext';
 
-export default function DM2000ExportTab({ stationId, selection, selectedBaty, onBatyChange }) {
+export default function DM2000ExportTab({ stationId, selection }) {
   const { t } = useLang();
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
   const [templates, setTemplates] = useState([]);
   const [templateName, setTemplateName] = useState('');
+  const [exportBatys, setExportBatys] = useState([0]);
 
   useEffect(() => {
     let active = true;
@@ -45,21 +46,31 @@ export default function DM2000ExportTab({ stationId, selection, selectedBaty, on
     };
   }, [stationId]);
 
+  useEffect(() => {
+    setExportBatys([0]);
+  }, [selection?.archname]);
+
   const batteryOptions = useMemo(() => [
     { label: `${t('dm2000BatteryAverage')} (0)`, value: 0 },
-    ...Array.from({ length: 8 }).map((_, index) => ({ label: `${index + 1}#`, value: index + 1 })),
+    ...Array.from({ length: 9 }).map((_, index) => ({ label: `${index + 1}#`, value: index + 1 })),
   ], [t]);
 
   const handleDownload = async () => {
     if (!stationId || !selection?.archname || !templateName) return;
+    if (exportBatys.length === 0) {
+      notification.warning({ message: t('dm2000SelectAtLeastOne') });
+      return;
+    }
     setDownloading(true);
     try {
-      await downloadDM2000Report({
-        stationId,
-        archname: selection.archname,
-        baty: selectedBaty,
-        templateName,
-      });
+      for (const baty of exportBatys) {
+        await downloadDM2000Report({
+          stationId,
+          archname: selection.archname,
+          baty,
+          templateName,
+        });
+      }
       notification.success({ message: t('dmpReportDownloaded') });
     } catch (err) {
       notification.error({ message: t('dmpReportDownloadFailed'), description: err.message });
@@ -81,13 +92,21 @@ export default function DM2000ExportTab({ stationId, selection, selectedBaty, on
       {error && <Alert type="error" showIcon message={error} />}
 
       <Card size="small" title={t('dm2000SelectBattery')}>
-        <Radio.Group
-          optionType="button"
-          buttonStyle="solid"
-          options={batteryOptions}
-          value={selectedBaty}
-          onChange={(event) => onBatyChange(event.target.value)}
-        />
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space wrap>
+            <Button size="small" onClick={() => setExportBatys(batteryOptions.map((item) => item.value))}>
+              {t('dm2000SelectAll')}
+            </Button>
+            <Button size="small" onClick={() => setExportBatys([])}>
+              {t('dm2000ClearAll')}
+            </Button>
+          </Space>
+          <Checkbox.Group
+            options={batteryOptions}
+            value={exportBatys}
+            onChange={(values) => setExportBatys(values)}
+          />
+        </Space>
       </Card>
 
       <Card size="small" title={t('dmpExportTab')}>
@@ -125,9 +144,9 @@ export default function DM2000ExportTab({ stationId, selection, selectedBaty, on
         type="primary"
         onClick={handleDownload}
         loading={downloading}
-        disabled={!stationId || !selection?.archname || !templateName}
+        disabled={!stationId || !selection?.archname || !templateName || exportBatys.length === 0}
       >
-        {t('dm2000DownloadReport')}
+        {`${t('dm2000DownloadReport')} (${exportBatys.length} ${t('dm2000BatteryUnit')})`}
       </Button>
     </Space>
   );
