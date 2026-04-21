@@ -57,7 +57,7 @@ export default function DM2000DailyVoltTab({ stationId, selection, selectedBaty,
     };
   }, [stationId, selection?.archname, selectedBaty]);
 
-  const batteryOptions = useMemo(() => Array.from({ length: 8 }).map((_, index) => ({
+  const batteryOptions = useMemo(() => Array.from({ length: 9 }).map((_, index) => ({
     value: index + 1,
     label: `${index + 1}#`,
   })), []);

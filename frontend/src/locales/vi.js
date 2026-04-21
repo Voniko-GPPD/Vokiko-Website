@@ -546,4 +546,8 @@ export default {
   dm2000MadeDate: 'Ngày sản xuất',
   dm2000SerialNo: 'Số seri',
   dm2000Remarks: 'Ghi chú',
+  dm2000SearchTab: 'Tải dữ liệu',
+  dm2000SelectAll: 'Chọn tất cả',
+  dm2000ClearAll: 'Bỏ chọn tất cả',
+  dm2000SelectAtLeastOne: 'Vui lòng chọn ít nhất một pin',
 };
