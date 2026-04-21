@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 from contextlib import asynccontextmanager, contextmanager
+from datetime import date
 from io import BytesIO
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openpyxl import load_workbook
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -169,11 +170,17 @@ def shadow_copy_any(mdb_path: str, allowed_dir: str):
         # Validate: must be at least 32 KB and start with Jet/ACE magic bytes
         copied_size = os.path.getsize(tmp_path)
         if copied_size < 32 * 1024:
-            raise HTTPException(status_code=422, detail=f"File too small ({copied_size} bytes)")
+            raise HTTPException(
+                status_code=422,
+                detail=f"File too small ({copied_size} bytes) to be a valid Access database (possible Windows shortcut)",
+            )
         with open(tmp_path, "rb") as fh:
             magic = fh.read(4)
         if magic != b"\x00\x01\x00\x00":
-            raise HTTPException(status_code=422, detail="Not a valid Access database")
+            raise HTTPException(
+                status_code=422,
+                detail="Not a valid Access database header (possible Windows shortcut)",
+            )
 
         yield tmp_path
     finally:
@@ -192,6 +199,7 @@ def shadow_copy(mdb_path: str):
 
 @contextmanager
 def shadow_copy_dm2000(mdb_path: str):
+    """Copy DM2000 .mdb to a temp file before querying to avoid lock conflicts."""
     with shadow_copy_any(mdb_path, DM2000_DATA_DIR) as tmp:
         yield tmp
 
@@ -367,8 +375,8 @@ class ReportRequest(BaseModel):
 
 class DM2000ReportRequest(BaseModel):
     archname: str
-    baty: int
-    template_name: str
+    baty: int = Field(ge=0)
+    template_name: str = Field(min_length=6)
 
 
 def render_excel_template(template_path: str, context: dict) -> bytes:
@@ -434,15 +442,21 @@ def _process_worksheet(ws, ctx: dict):
 
 
 def _resolve_template_path(template_name: str) -> str:
-    parsed = Path(template_name)
-    if parsed.parent != Path(".") or parsed.suffix.lower() != ".xlsx":
-        raise HTTPException(status_code=400, detail="Invalid template")
-    if not re.match(r'^[A-Za-z0-9_-]+$', parsed.stem):
+    if not _is_valid_template_name(template_name):
         raise HTTPException(status_code=400, detail="Invalid template")
 
-    result = Path(DMP_TEMPLATES_DIR).resolve() / parsed.name
-    if not str(result).startswith(str(Path(DMP_TEMPLATES_DIR).resolve())):
-        raise HTTPException(status_code=400, detail="Invalid path")
+    base = Path(DMP_TEMPLATES_DIR).resolve()
+    allowed = {
+        f.name for f in base.iterdir()
+        if f.is_file() and _is_valid_template_name(f.name)
+    } if base.exists() else set()
+    if template_name not in allowed:
+        raise HTTPException(status_code=404, detail="Template not found")
+    result = (base / template_name).resolve()
+    try:
+        result.relative_to(base)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Template path traversal detected") from exc
     if not result.exists():
         raise HTTPException(status_code=404, detail="Template not found")
     return str(result)
@@ -465,14 +479,21 @@ def _read_dm2000_ls(sql: str, params: tuple = ()) -> list[dict]:
 
 
 def _resolve_dm2000_template_path(template_name: str) -> str:
-    parsed = Path(template_name)
-    if parsed.parent != Path(".") or parsed.suffix.lower() != ".xlsx":
+    if not _is_valid_template_name(template_name):
         raise HTTPException(status_code=400, detail="Invalid template")
-    if not re.match(r'^[A-Za-z0-9_-]+$', parsed.stem):
-        raise HTTPException(status_code=400, detail="Invalid template")
-    result = Path(DM2000_TEMPLATES_DIR).resolve() / parsed.name
-    if not str(result).startswith(str(Path(DM2000_TEMPLATES_DIR).resolve())):
-        raise HTTPException(status_code=400, detail="Invalid path")
+
+    base = Path(DM2000_TEMPLATES_DIR).resolve()
+    allowed = {
+        f.name for f in base.iterdir()
+        if f.is_file() and _is_valid_template_name(f.name)
+    } if base.exists() else set()
+    if template_name not in allowed:
+        raise HTTPException(status_code=404, detail="Template not found")
+    result = (base / template_name).resolve()
+    try:
+        result.relative_to(base)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Template path traversal detected") from exc
     if not result.exists():
         raise HTTPException(status_code=404, detail="Template not found")
     return str(result)
@@ -546,6 +567,17 @@ def _dm2000_get_value(row: dict, *keys):
     return None
 
 
+def _is_valid_template_name(name: str) -> bool:
+    if not isinstance(name, str):
+        return False
+    if "/" in name or "\\" in name:
+        return False
+    if not name.endswith(".xlsx"):
+        return False
+    stem = name[:-5]
+    return bool(stem) and all(ch.isalnum() or ch in "_-" for ch in stem)
+
+
 def _validate_dm2000_archname(archname: str) -> None:
     if not re.match(r'^[A-Za-z0-9_-]+$', archname):
         raise HTTPException(status_code=400, detail="Invalid archname")
@@ -598,6 +630,15 @@ def _read_dm2000_average_curve_rows(archname: str) -> list[dict]:
                 tim = row.get(f"time{idx}")
                 flattened.append({"TIM": tim, "VOLT": volt})
         return _compute_average_curve(flattened)
+
+
+def _parse_iso_date_param(value: str | None, field_name: str) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid {field_name}, expected YYYY-MM-DD") from exc
 
 
 def _query_vidata_by_channel(mdb_path: str, channel: int) -> list[dict]:
@@ -873,6 +914,8 @@ def get_dm2000_archives(
     limit: int = 500,
 ):
     rows = _read_dm2000_ls("SELECT * FROM ls_jb_cs")
+    date_from_parsed = _parse_iso_date_param(date_from, "date_from")
+    date_to_parsed = _parse_iso_date_param(date_to, "date_to")
 
     def _to_date_text(value):
         if value and hasattr(value, "strftime"):
@@ -903,9 +946,15 @@ def get_dm2000_archives(
 
     filtered = []
     for row in archives:
-        if date_from and row["startdate"] and row["startdate"] < date_from:
+        row_date = None
+        if row["startdate"]:
+            try:
+                row_date = date.fromisoformat(str(row["startdate"])[:10])
+            except ValueError:
+                row_date = None
+        if date_from_parsed and row_date and row_date < date_from_parsed:
             continue
-        if date_to and row["startdate"] and row["startdate"] > date_to:
+        if date_to_parsed and row_date and row_date > date_to_parsed:
             continue
         if not _contains(row.get("dcxh"), type_filter):
             continue
