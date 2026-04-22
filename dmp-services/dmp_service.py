@@ -1338,7 +1338,7 @@ def get_dm2000_archives(
         item = {
             "archname": _dm2000_get_value(row, "archname", "cdid", "id"),
             "startdate": _to_date_text(_dm2000_get_value(row, "startdate", "fdrq")),
-            "enddate": _to_date_text(_dm2000_get_value(row, "enddate", "fzdq", "jssj", "endrq", "endate", "end_date")),
+            "enddate": _to_date_text(_dm2000_get_value(row, "enddate", "fzdq", "jssj", "endrq", "endate", "end_date", "fzrq", "stopdate", "fdend")),
             "dcxh": _dm2000_get_value(row, "dcxh"),
             "name": _dm2000_get_value(row, "name", "dcmc"),
             "fdfs": _dm2000_get_value(row, "fdfs"),
@@ -1372,7 +1372,7 @@ def get_dm2000_archives(
                 "fdtj", "hjtj", "temperature", "temp_c",
                 "temp", "hjt", "qw", "t", "csh",
             ),
-            "min_duration": _dm2000_get_value(row, "min_duration", "zdts", "min_ts", "minduration"),
+            "min_duration": _dm2000_get_value(row, "min_duration", "zdts", "min_ts", "minduration", "zdsc", "zxfdts"),
             "company": DM2000_COMPANY_NAME or None,
         }
         archives.append(item)
@@ -1675,6 +1675,35 @@ def get_dm2000_config():
     return {"company": DM2000_COMPANY_NAME or ""}
 
 
+@app.get("/dm2000/archives/{archname}/schema")
+def get_dm2000_archive_schema(archname: str):
+    """Return raw column names and non-null values for an archive row from ls_jb_cs.
+
+    This diagnostic endpoint helps identify the actual column names used in the
+    local DM2000 database when expected fields (e.g. voltage_type, endpoint_voltage)
+    are missing from report previews.
+    """
+    _validate_dm2000_archname(archname)
+    try:
+        rows = _read_dm2000_ls_multi([
+            ("SELECT * FROM ls_jb_cs WHERE cdid = ?", (archname,)),
+            ("SELECT * FROM ls_jb_cs WHERE archname = ?", (archname,)),
+        ])
+    except (pyodbc.Error, HTTPException) as exc:
+        raise HTTPException(status_code=500, detail=f"Schema query failed: {exc}") from exc
+    if not rows:
+        raise HTTPException(status_code=404, detail="Archive not found in ls_jb_cs")
+    row = rows[0]
+    columns = []
+    for k, v in row.items():
+        columns.append({
+            "column": k,
+            "value": str(v) if v not in (None, "") else None,
+            "is_null_like": v in (None, "", "--"),
+        })
+    return {"archname": archname, "columns": columns}
+
+
 @app.get("/dm2000/templates")
 def get_dm2000_templates():
     templates_dir = Path(DM2000_TEMPLATES_DIR).resolve()
@@ -1742,7 +1771,7 @@ def generate_dm2000_report(payload: DM2000ReportRequest):
         "BATTERY_NO": baty_label,
         # Extra fields for full template support
         "COMPANY": DM2000_COMPANY_NAME or "",
-        "END_DATE": str(_dm2000_get_value(archive, "enddate", "fzdq", "jssj", "endrq", "endate", "end_date") or ""),
+        "END_DATE": str(_dm2000_get_value(archive, "enddate", "fzdq", "jssj", "endrq", "endate", "end_date", "fzrq", "stopdate", "fdend") or ""),
         "VOLTAGE_TYPE": str(_dm2000_get_value(
             archive,
             "voltage_type", "bcdv", "dcdy", "dxy", "edy",
@@ -1763,7 +1792,7 @@ def generate_dm2000_report(payload: DM2000ReportRequest):
             "fdtj", "hjtj", "temperature", "temp_c",
             "temp", "hjt", "qw", "t", "csh",
         ) or ""),
-        "MIN_DURATION": str(_dm2000_get_value(archive, "min_duration", "zdts", "min_ts", "minduration") or ""),
+        "MIN_DURATION": str(_dm2000_get_value(archive, "min_duration", "zdts", "min_ts", "minduration", "zdsc", "zxfdts") or ""),
         **stats,
         "HISTORY_DATA": curve_data,
     }
@@ -1789,6 +1818,7 @@ def _build_preview_workbook(  # noqa: C901
     """Build a simple Excel workbook matching the ReportPreview HTML format."""
     from openpyxl import Workbook as _Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter as _get_col_letter
 
     THRESHOLDS = [1.40, 1.35, 1.30, 1.25, 1.20, 1.15, 1.10, 1.05, 1.00, 0.95, 0.90]
     thin = Side(style="thin")
@@ -1933,7 +1963,7 @@ def _build_preview_workbook(  # noqa: C901
         mx, mn, av = _agg(tav_vals)
         _set(r, 1, round(threshold, 3), fill=fill_label, align="left")
         for i, v in enumerate(tav_vals):
-            _set(r, 2 + i, round(v, 1) if v is not None else "-")
+            _set(r, 2 + i, round(v, 3) if v is not None else "-")
         _set(r, 2 + num_batys, mx); _set(r, 3 + num_batys, mn); _set(r, 4 + num_batys, av)
         r += 1
 
@@ -1944,7 +1974,7 @@ def _build_preview_workbook(  # noqa: C901
     # Column widths
     ws.column_dimensions["A"].width = 22
     for col_idx in range(2, total_cols + 1):
-        ltr = ws.cell(row=1, column=col_idx).column_letter
+        ltr = _get_col_letter(col_idx)
         ws.column_dimensions[ltr].width = 10
 
     buf = BytesIO()
@@ -1986,7 +2016,7 @@ def generate_dm2000_simple_report(payload: DM2000SimpleReportRequest):
         "archname": str(_dm2000_get_value(archive, "archname", "cdid", "id") or payload.archname),
         "name": str(_dm2000_get_value(archive, "name", "dcmc") or ""),
         "startdate": _to_date_text(_dm2000_get_value(archive, "startdate", "fdrq")),
-        "enddate": _to_date_text(_dm2000_get_value(archive, "enddate", "fzdq", "jssj", "endrq", "endate", "end_date")),
+        "enddate": _to_date_text(_dm2000_get_value(archive, "enddate", "fzdq", "jssj", "endrq", "endate", "end_date", "fzrq", "stopdate", "fdend")),
         "dcxh": str(_apply_override(_dm2000_get_value(archive, "dcxh"), payload.override_battery_type) or ""),
         "fdfs": str(_dm2000_get_value(archive, "fdfs") or ""),
         "unifrate": str(_dm2000_get_value(archive, "unifrate", "hl", "hlfd", "yfws_pct", "yfws") or ""),
@@ -1994,12 +2024,27 @@ def generate_dm2000_simple_report(payload: DM2000SimpleReportRequest):
         "madedate": _to_date_text(_dm2000_get_value(archive, "madedate", "scrq")),
         "serialno": str(_dm2000_get_value(archive, "serialno", "dcph") or ""),
         "remarks": str(_dm2000_get_value(archive, "remarks", "bz") or ""),
-        "voltage_type": str(_dm2000_get_value(archive, "voltage_type", "bcdv", "dcdy", "dxy", "edy", "nominal_voltage", "lxdy", "vtype", "battv", "lx", "dctype", "v_type") or ""),
+        "voltage_type": str(_dm2000_get_value(
+            archive,
+            "voltage_type", "bcdv", "dcdy", "dxy", "edy",
+            "nominal_voltage", "dianxin_leixing", "dianxin", "nominal_v",
+            "lxdy", "vtype", "battv", "lx", "dctype", "v_type",
+        ) or ""),
         "trademark": str(_dm2000_get_value(archive, "trademark", "shangbiao", "sbmc", "pinpai") or ""),
         "load_resistance": str(_dm2000_get_value(archive, "load_resistance", "fzdz", "fzlkdz", "dw") or ""),
-        "endpoint_voltage": str(_dm2000_get_value(archive, "endpoint_voltage", "jzdy", "jzdianyi", "jzdv", "jz", "endpoint_v", "vcut", "cutoffv", "jzdian", "evy", "minv", "cutv", "jz_dy") or ""),
-        "dis_condition": str(_dm2000_get_value(archive, "dis_condition", "wd", "fdwd", "hjwd", "wendu", "fdtj", "hjtj", "temperature", "temp_c", "temp", "hjt", "qw", "t", "csh") or ""),
-        "min_duration": str(_dm2000_get_value(archive, "min_duration", "zdts", "min_ts", "minduration") or ""),
+        "endpoint_voltage": str(_dm2000_get_value(
+            archive,
+            "endpoint_voltage", "jzdy", "jzdianyi", "jzdv", "jz",
+            "endpoint_v", "vcut", "cutoffv", "cutoff_v",
+            "jzdian", "evy", "minv", "cutv", "jz_dy",
+        ) or ""),
+        "dis_condition": str(_dm2000_get_value(
+            archive,
+            "dis_condition", "wd", "fdwd", "hjwd", "wendu",
+            "fdtj", "hjtj", "temperature", "temp_c",
+            "temp", "hjt", "qw", "t", "csh",
+        ) or ""),
+        "min_duration": str(_dm2000_get_value(archive, "min_duration", "zdts", "min_ts", "minduration", "zdsc", "zxfdts") or ""),
     }
 
     # Fetch per-battery params (OCV/FCV/SOt)
