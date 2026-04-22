@@ -53,6 +53,8 @@ _DM2000_LS_CACHE_PATH: str = ""           # path to the current cached copy
 _DM2000_LS_SOURCE_MTIME: float = -1.0    # mtime of the last successfully cached source
 _DM2000_LS_CACHE_WRITE_LOCK = threading.Lock()   # one writer at a time
 _DM2000_LS_CACHE_READY = threading.Event()        # set once the first copy is done
+# Seconds to wait for the initial cache build before returning 503 to callers.
+_DM2000_LS_CACHE_READY_TIMEOUT: float = 30.0
 _TELEMETRY_CACHE: dict[tuple, tuple[list, float]] = {}
 _TELEMETRY_CACHE_LOCK = threading.Lock()
 _TELEMETRY_CACHE_TTL: float = 60.0  # seconds
@@ -205,7 +207,10 @@ def _dm2000_refresh_ls_cache(force: bool = False) -> None:
                 _DM2000_LS_CACHE_READY.set()
             return
 
-        # Validate magic bytes before replacing
+        # Validate magic bytes before replacing.
+        # The first 4 bytes of a valid Jet/Access .mdb file are 0x00 0x01 0x00 0x00
+        # (Jet3/Jet4 format identifier).  This prevents caching a partially-written
+        # or corrupt file.
         try:
             size = os.path.getsize(cache_tmp)
             if size >= 32 * 1024:
@@ -603,12 +608,12 @@ def _read_dmpdata(sql: str, params: tuple = ()) -> list[dict]:
 def _read_dm2000_ls(sql: str, params: tuple = ()) -> list[dict]:
     """Query the persistent local cache of dmdata_ls.mdb.
 
-    Waits up to 30 s for the initial cache to be built (startup), then reads
+    Waits up to _DM2000_LS_CACHE_READY_TIMEOUT seconds for the initial cache to be built (startup), then reads
     directly from the cached copy without creating a new shadow copy per request.
     The global ACCESS_QUERY_LOCK inside query_mdb still caps concurrent ODBC
     connections, but no per-request file duplication overhead exists.
     """
-    if not _DM2000_LS_CACHE_READY.wait(timeout=30):
+    if not _DM2000_LS_CACHE_READY.wait(timeout=_DM2000_LS_CACHE_READY_TIMEOUT):
         raise HTTPException(
             status_code=503,
             detail="DM2000 database not ready, please retry shortly",
@@ -625,7 +630,7 @@ def _read_dm2000_ls_multi(queries: list[tuple[str, tuple]]) -> list[dict]:
     Raises HTTPException(503) when the cache is not yet ready.
     Re-raises the last :class:`pyodbc.Error` when every query in *queries* fails.
     """
-    if not _DM2000_LS_CACHE_READY.wait(timeout=30):
+    if not _DM2000_LS_CACHE_READY.wait(timeout=_DM2000_LS_CACHE_READY_TIMEOUT):
         raise HTTPException(
             status_code=503,
             detail="DM2000 database not ready, please retry shortly",

@@ -130,6 +130,7 @@ export default function DM2000ExportTab({ stationId, selection }) {
       .then((rows) => {
         if (!active) return;
         const nums = (rows || [])
+          // baty = archname-based schema; gpp = cdid-based schema (para_singl.gpp = pin/position number)
           .map((row) => Number(row?.baty ?? row?.BATY ?? row?.Baty ?? row?.gpp ?? row))
           .filter((v) => Number.isFinite(v) && v > 0);
         setBatteries(nums);
