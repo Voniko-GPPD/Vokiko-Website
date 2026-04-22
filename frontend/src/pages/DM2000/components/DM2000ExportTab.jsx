@@ -379,7 +379,7 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
     // The time-at-voltage endpoint returns values in minutes; the report
     // preview and DM2000 Excel export both display them in hours.
     const val = safeNum(row.minutes ?? row.MINUTES);
-    return val != null ? (val / 60).toFixed(1) : '-';
+    return val != null ? (val / 60).toFixed(3) : '-';
   };
 
   const fmtStat = (baty, key) => {
@@ -576,9 +576,9 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
                 {previewBatys.map((b, idx) => (
                   <td key={b} style={cellStyle}>{cellVals[idx]}</td>
                 ))}
-                <td style={cellStyle}>{numericVals.length > 0 ? Math.max(...numericVals).toFixed(1) : '-'}</td>
-                <td style={cellStyle}>{numericVals.length > 0 ? Math.min(...numericVals).toFixed(1) : '-'}</td>
-                <td style={cellStyle}>{numericVals.length > 0 ? (numericVals.reduce((s, v) => s + v, 0) / numericVals.length).toFixed(1) : '-'}</td>
+                <td style={cellStyle}>{numericVals.length > 0 ? Math.max(...numericVals).toFixed(3) : '-'}</td>
+                <td style={cellStyle}>{numericVals.length > 0 ? Math.min(...numericVals).toFixed(3) : '-'}</td>
+                <td style={cellStyle}>{numericVals.length > 0 ? (numericVals.reduce((s, v) => s + v, 0) / numericVals.length).toFixed(3) : '-'}</td>
               </tr>
             );
           })}

@@ -272,6 +272,16 @@ router.get('/dm2000/templates', authenticateToken, async (req, res, next) => {
   } catch (err) { handleProxyError(err, res, next); }
 });
 
+// GET /api/dmp/dm2000/archives/:archname/schema?stationId= — diagnostic: return raw column names from ls_jb_cs
+router.get('/dm2000/archives/:archname/schema', authenticateToken, async (req, res, next) => {
+  const stationUrl = getStationUrl(req.query.stationId, res);
+  if (!stationUrl) return;
+  try {
+    const r = await axios.get(`${stationUrl}/dm2000/archives/${encodeURIComponent(req.params.archname)}/schema`, { timeout: 15000 });
+    res.json(r.data);
+  } catch (err) { handleProxyError(err, res, next); }
+});
+
 router.post('/dm2000/report', authenticateToken, async (req, res, next) => {
   const { stationId, ...reportBody } = req.body || {};
   const stationUrl = getStationUrl(stationId, res);
