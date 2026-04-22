@@ -137,20 +137,24 @@ export default function DM2000ExportTab({ stationId, selection }) {
       Promise.all(missing.map((baty) =>
         fetchDM2000Stats(stationId, selection.archname, baty, { signal: controller.signal })
           .then((s) => [baty, s || {}])
-          .catch((err) => (err.name === 'AbortError' ? null : [baty, {}])),
+          .catch((err) => {
+            if (err.name === 'AbortError') throw err;
+            return [baty, {}];
+          }),
       )),
       Promise.all(missing.map((baty) =>
         fetchDM2000TimeAtVoltage(stationId, selection.archname, baty, { signal: controller.signal })
           .then((rows) => [baty, rows || []])
-          .catch((err) => (err.name === 'AbortError' ? null : [baty, []])),
+          .catch((err) => {
+            if (err.name === 'AbortError') throw err;
+            return [baty, []];
+          }),
       )),
     ]).then(([statsEntries, timeEntries]) => {
       if (!active) return;
-      const validStats = statsEntries.filter(Boolean);
-      const validTime = timeEntries.filter(Boolean);
-      setPreviewStats((prev) => ({ ...prev, ...Object.fromEntries(validStats) }));
-      setPreviewTimeAtVolt((prev) => ({ ...prev, ...Object.fromEntries(validTime) }));
-    });
+      setPreviewStats((prev) => ({ ...prev, ...Object.fromEntries(statsEntries) }));
+      setPreviewTimeAtVolt((prev) => ({ ...prev, ...Object.fromEntries(timeEntries) }));
+    }).catch(() => {});
     return () => { active = false; controller.abort(); };
   }, [stationId, selection?.archname, previewBatys]);
 

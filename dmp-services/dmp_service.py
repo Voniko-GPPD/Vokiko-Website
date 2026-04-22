@@ -38,6 +38,8 @@ _ACCESS_QUERY_LOCK = threading.Semaphore(5)
 _ACCESS_QUERY_TIMEOUT: float = 60.0  # seconds to wait for a DB slot before returning 503
 # Limit concurrent DM2000 shadow-copy + query operations to avoid memory/disk exhaustion
 # when many requests arrive simultaneously (e.g. when a user rapidly switches archives).
+# Each shadow copy duplicates dmdata_ls.mdb on disk and loads its query results into memory,
+# so limiting to 2 concurrent operations keeps peak resource usage predictable.
 _DM2000_LS_LOCK = threading.Semaphore(2)
 _TELEMETRY_CACHE: dict[tuple, tuple[list, float]] = {}
 _TELEMETRY_CACHE_LOCK = threading.Lock()
@@ -1212,7 +1214,7 @@ def get_dm2000_batteries(archname: str):
         rows = _derive_dm2000_batteries_from_vtime(archname)
 
     with _DM2000_BATTERIES_CACHE_LOCK:
-        _DM2000_BATTERIES_CACHE[archname] = (rows, time.time())
+        _cache_set_with_cap(_DM2000_BATTERIES_CACHE, archname, (rows, time.time()))
     return {"batteries": rows, "archname": archname}
 
 
