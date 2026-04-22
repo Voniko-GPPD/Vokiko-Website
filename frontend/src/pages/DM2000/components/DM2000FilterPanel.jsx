@@ -58,7 +58,18 @@ export default function DM2000FilterPanel({ stationId, selectedArchname, onSelec
     { title: t('dm2000StartDate'), dataIndex: 'startdate', key: 'startdate', width: 140 },
     { title: t('dm2000Type'), dataIndex: 'dcxh', key: 'dcxh', width: 120 },
     { title: t('dm2000Name'), dataIndex: 'name', key: 'name', width: 140 },
-    { title: t('dm2000DisCondition'), dataIndex: 'fdfs', key: 'fdfs', width: 130 },
+    {
+      title: t('dm2000DisCondition'),
+      key: 'dis_condition',
+      width: 180,
+      render: (_, record) => {
+        const parts = [];
+        if (record.load_resistance != null && record.load_resistance !== '') parts.push(`${record.load_resistance} ohm`);
+        if (record.fdfs != null && record.fdfs !== '') parts.push(`${record.fdfs}h/d`);
+        if (record.endpoint_voltage != null && record.endpoint_voltage !== '') parts.push(`to ${record.endpoint_voltage}V`);
+        return parts.length > 0 ? parts.join(',') : '-';
+      },
+    },
     { title: t('dm2000Duration'), dataIndex: 'duration', key: 'duration', width: 120 },
     { title: t('dm2000UnifRate'), dataIndex: 'unifrate', key: 'unifrate', width: 100 },
     { title: t('dm2000Manufacturer'), dataIndex: 'manufacturer', key: 'manufacturer', width: 140 },

@@ -407,13 +407,16 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
   /** Get SOt mAh from ls_pam2. */
   const getSot = (baty) => {
     const row = batteryParams[baty];
-    const v = getBatteryField(row, 'sot', 'SOT', 'sot_mah', 'sotmah', 'sh', 'rql', 'capacity');
+    const v = getBatteryField(row, 'sot_mah', 'sot', 'SOT', 'sotmah', 'sh', 'rql', 'capacity');
     return v != null ? fmt(v, 3) : '-';
   };
 
   // Aggregate helpers
   const aggVals = (fn) => {
-    const vals = previewBatys.map((b) => safeNum(fn(b))).filter((v) => v != null);
+    const vals = previewBatys.map((b) => {
+      const raw = fn(b);
+      return raw == null ? null : safeNum(raw);
+    }).filter((v) => v != null);
     return vals;
   };
 
@@ -427,9 +430,9 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
     ];
   };
 
-  const [ocvMax, ocvMin, ocvAvg] = rowAgg((b) => statsMap[b]?.OCV ?? safeNum(getBatteryField(batteryParams[b], 'ocv', 'OCV')), 3);
-  const [fcvMax, fcvMin, fcvAvg] = rowAgg((b) => statsMap[b]?.FCV ?? safeNum(getBatteryField(batteryParams[b], 'fcv', 'FCV')), 3);
-  const [sotMax, sotMin, sotAvg] = rowAgg((b) => safeNum(getBatteryField(batteryParams[b], 'sot', 'SOT', 'sot_mah', 'sotmah', 'sh', 'rql', 'capacity')), 3);
+  const [ocvMax, ocvMin, ocvAvg] = rowAgg((b) => statsMap[b]?.OCV ?? getBatteryField(batteryParams[b], 'ocv', 'OCV'), 3);
+  const [fcvMax, fcvMin, fcvAvg] = rowAgg((b) => statsMap[b]?.FCV ?? getBatteryField(batteryParams[b], 'fcv', 'FCV'), 3);
+  const [sotMax, sotMin, sotAvg] = rowAgg((b) => getBatteryField(batteryParams[b], 'sot_mah', 'sot', 'SOT', 'sotmah', 'sh', 'rql', 'capacity'), 3);
 
   return (
     <div style={{ overflowX: 'auto', fontFamily: 'Arial, sans-serif' }}>
