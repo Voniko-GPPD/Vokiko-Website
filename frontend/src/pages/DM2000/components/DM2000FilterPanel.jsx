@@ -63,10 +63,11 @@ export default function DM2000FilterPanel({ stationId, selectedArchname, onSelec
       key: 'dis_condition',
       width: 180,
       render: (_, record) => {
-        const parts = [];
-        if (record.load_resistance != null && record.load_resistance !== '') parts.push(`${record.load_resistance} ohm`);
-        if (record.fdfs != null && record.fdfs !== '') parts.push(`${record.fdfs}h/d`);
-        if (record.endpoint_voltage != null && record.endpoint_voltage !== '') parts.push(`to ${record.endpoint_voltage}V`);
+        const resistance = record.load_resistance != null && record.load_resistance !== '' ? `${record.load_resistance} ohm` : '';
+        const pattern = record.fdfs != null && record.fdfs !== '' ? String(record.fdfs) : '';
+        const endpoint = record.endpoint_voltage != null && record.endpoint_voltage !== '' ? `to ${record.endpoint_voltage}V` : '';
+        const rightPart = [pattern, endpoint].filter(Boolean).join(' ');
+        const parts = [resistance, rightPart].filter(Boolean);
         return parts.length > 0 ? parts.join(',') : '-';
       },
     },
