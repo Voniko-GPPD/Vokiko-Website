@@ -201,28 +201,11 @@ export default function DM2000CurveTab({ stationId, selection }) {
           selectedBaty > 0
             ? fetchDM2000Curve(stationId, selection.archname, selectedBaty)
             : fetchDM2000AverageCurve(stationId, selection.archname),
-          selectedBaty > 0
-            ? fetchDM2000Stats(stationId, selection.archname, selectedBaty)
-            : Promise.resolve(null),
+          fetchDM2000Stats(stationId, selection.archname, selectedBaty),
         ]);
         if (!active) return;
         setCurve(curveRows || []);
-        if (selectedBaty === 0) {
-          const voltVals = (curveRows || [])
-            .map((row) => safeNum(row.VOLT))
-            .filter((value) => value !== null);
-          const timVals = (curveRows || [])
-            .map((row) => safeNum(row.TIM))
-            .filter((value) => value !== null);
-          setStats(voltVals.length > 0 ? {
-            VOLT_MAX: Math.max(...voltVals),
-            VOLT_MIN: Math.min(...voltVals),
-            VOLT_AVG: voltVals.reduce((acc, value) => acc + value, 0) / voltVals.length,
-            DURATION_MIN: timVals.length > 0 ? Math.max(...timVals) : null,
-          } : {});
-        } else {
-          setStats(statsRows || {});
-        }
+        setStats(statsRows || {});
       } catch (err) {
         if (!active) return;
         setError(err.message || 'Failed to load curve data');

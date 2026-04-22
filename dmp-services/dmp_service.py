@@ -573,6 +573,62 @@ def _compute_average_curve(rows: list[dict]) -> list[dict]:
     ]
 
 
+def _get_evolt_volt_stats(archname: str, baty: int) -> dict | None:
+    """Get VOLT_MAX (OCV), VOLT_MIN (FCV), VOLT_AVG from ls_evolt for a battery.
+
+    Returns a dict with VOLT_MAX, VOLT_MIN, VOLT_AVG, or None if no data found.
+
+    The data is queried ORDER BY date/daytime ASC so the first row is the OCV
+    (voltage measured before discharge begins, always the highest value) and
+    the last row is the FCV (voltage at the end of discharge, always the lowest).
+    Using positional first/last rather than max/min is intentional: OCV and FCV
+    are defined as the chronologically first and last measurements, not simply
+    the extreme values in the series.
+    """
+    def safe_float(v):
+        if v is None or v in ("--", ""):
+            return None
+        try:
+            f = float(v)
+            return None if math.isnan(f) else f
+        except (TypeError, ValueError):
+            return None
+
+    volt_rows = []
+    # Try archname-based schema first
+    try:
+        rows = _read_dm2000_ls(
+            "SELECT volt FROM ls_evolt WHERE archname = ? AND baty = ? ORDER BY date ASC",
+            (archname, baty),
+        )
+        if rows:
+            volt_rows = [safe_float(r.get("volt")) for r in rows]
+    except pyodbc.Error:
+        pass
+
+    if not volt_rows:
+        # Try cdid-based schema
+        volt_col = f"volt{baty}"
+        try:
+            rows = _read_dm2000_ls(
+                f"SELECT {volt_col} AS volt FROM ls_evolt WHERE cdid = ? ORDER BY daytime ASC",
+                (archname,),
+            )
+            volt_rows = [safe_float(r.get("volt")) for r in rows]
+        except pyodbc.Error:
+            pass
+
+    volt_vals = [v for v in volt_rows if v is not None]
+    if not volt_vals:
+        return None
+
+    return {
+        "VOLT_MAX": volt_vals[0],   # OCV – first daily measurement (start of discharge)
+        "VOLT_MIN": volt_vals[-1],  # FCV – last daily measurement (end of discharge)
+        "VOLT_AVG": round(sum(volt_vals) / len(volt_vals), 4),
+    }
+
+
 def _dm2000_get_value(row: dict, *keys):
     for key in keys:
         if key in row and row.get(key) not in (None, ""):
@@ -1155,7 +1211,16 @@ def get_dm2000_stats(archname: str, baty: int = 0):
         rows = _read_dm2000_average_curve_rows(archname)
     else:
         rows = _read_dm2000_curve_rows(archname, baty)
-    return compute_dm2000_stats(rows)
+    stats = compute_dm2000_stats(rows)
+    # Override VOLT_MAX/VOLT_MIN/VOLT_AVG with OCV/FCV from daily voltage (ls_evolt).
+    # For the cdid-based schema, ls_vtime stores voltage thresholds rather than real
+    # measured voltages, so compute_dm2000_stats produces wrong values (always the
+    # fixed threshold limits 1.4 / 0.9).  Using ls_evolt gives the true OCV and FCV.
+    if baty > 0:
+        evolt_stats = _get_evolt_volt_stats(archname, baty)
+        if evolt_stats:
+            stats.update(evolt_stats)
+    return stats
 
 
 @app.get("/dm2000/archives/{archname}/daily-voltage")
@@ -1200,19 +1265,35 @@ def get_dm2000_time_at_voltage(archname: str, baty: int):
             "SELECT * FROM ls_timev WHERE archname = ? AND baty = ?",
             (archname, baty),
         )
+        if rows:
+            return {"time_at_voltage": rows, "archname": archname, "baty": baty}
+    except pyodbc.Error:
+        pass
+
+    if baty <= 0 or baty > 99:
+        raise HTTPException(status_code=400, detail="Invalid baty")
+    tim_col = f"tim_vot{baty}"
+    try:
+        rows = _read_dm2000_ls(
+            f"SELECT sj, {tim_col} AS minutes FROM ls_timev WHERE cdid = ? ORDER BY sj DESC",
+            (archname,),
+        )
+        if rows:
+            return {"time_at_voltage": rows, "archname": archname, "baty": baty}
+    except pyodbc.Error:
+        pass
+
+    # Final fallback: ls_vtime stores the same time-at-voltage data for the cdid-based
+    # schema using dy (voltage threshold) and time1..time9 columns (values in minutes).
+    time_col = f"time{baty}"
+    try:
+        rows = _read_dm2000_ls(
+            f"SELECT dy AS sj, {time_col} AS minutes FROM ls_vtime WHERE cdid = ? ORDER BY dy DESC",
+            (archname,),
+        )
         return {"time_at_voltage": rows, "archname": archname, "baty": baty}
     except pyodbc.Error:
-        if baty <= 0 or baty > 99:
-            raise HTTPException(status_code=400, detail="Invalid baty")
-        tim_col = f"tim_vot{baty}"
-        try:
-            rows = _read_dm2000_ls(
-                f"SELECT sj, {tim_col} AS minutes FROM ls_timev WHERE cdid = ? ORDER BY sj DESC",
-                (archname,),
-            )
-        except pyodbc.Error:
-            return {"time_at_voltage": [], "archname": archname, "baty": baty}
-        return {"time_at_voltage": rows, "archname": archname, "baty": baty}
+        return {"time_at_voltage": [], "archname": archname, "baty": baty}
 
 
 @app.get("/dm2000/templates")
@@ -1255,6 +1336,13 @@ def generate_dm2000_report(payload: DM2000ReportRequest):
         return override_val if override_val is not None and str(override_val).strip() != "" else db_val
 
     stats = compute_dm2000_stats(curve_data)
+    # Override VOLT_MAX/VOLT_MIN/VOLT_AVG with OCV/FCV from ls_evolt (daily voltage).
+    # For the cdid-based schema the curve VOLT values are fixed voltage thresholds
+    # rather than real measurements, so ls_evolt gives the true OCV and FCV.
+    if payload.baty > 0:
+        evolt_stats = _get_evolt_volt_stats(payload.archname, payload.baty)
+        if evolt_stats:
+            stats.update(evolt_stats)
     context = {
         "ARCHNAME": _apply_override(_dm2000_get_value(archive, "archname", "cdid", "id"), payload.override_archname),
         "START_DATE": _apply_override(str(_dm2000_get_value(archive, "startdate", "fdrq", "fdkssj", "qyrq", "fdrq") or ""), payload.override_start_date),
