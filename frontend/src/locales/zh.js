@@ -566,4 +566,5 @@ export default {
   dm2000EndpointVoltage: '截止电压',
   dm2000Temperature: '放电条件',
   dm2000MinDuration: '最短时长',
+  dm2000MeasureInstrument: '测量仪器',
 };

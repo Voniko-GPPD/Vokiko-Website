@@ -1356,7 +1356,7 @@ def get_dm2000_archives(
                 row,
                 "voltage_type", "bcdv", "dcdy", "dxy", "edy",
                 "nominal_voltage", "dianxin_leixing", "dianxin", "nominal_v",
-                "lxdy", "vtype", "battv", "lx", "dctype", "v_type",
+                "lxdy", "vtype", "battv", "lx", "dctype", "v_type", "jstj",
             ),
             "trademark": _dm2000_get_value(row, "trademark", "shangbiao", "sbmc", "pinpai"),
             "load_resistance": _dm2000_get_value(row, "load_resistance", "fzdz", "fzlkdz", "dw"),
@@ -1364,13 +1364,13 @@ def get_dm2000_archives(
                 row,
                 "endpoint_voltage", "jzdy", "jzdianyi", "jzdv", "jz",
                 "endpoint_v", "vcut", "cutoffv", "cutoff_v",
-                "jzdian", "evy", "minv", "cutv", "jz_dy",
+                "jzdian", "evy", "minv", "cutv", "jz_dy", "zzdy",
             ),
             "dis_condition": _dm2000_get_value(
                 row,
                 "dis_condition", "wd", "fdwd", "hjwd", "wendu",
                 "fdtj", "hjtj", "temperature", "temp_c",
-                "temp", "hjt", "qw", "t", "csh",
+                "temp", "hjt", "qw", "t", "csh", "jchj",
             ),
             "min_duration": _dm2000_get_value(row, "min_duration", "zdts", "min_ts", "minduration", "zdsc", "zxfdts"),
             "company": DM2000_COMPANY_NAME or None,
@@ -1776,7 +1776,7 @@ def generate_dm2000_report(payload: DM2000ReportRequest):
             archive,
             "voltage_type", "bcdv", "dcdy", "dxy", "edy",
             "nominal_voltage", "dianxin_leixing", "dianxin", "nominal_v",
-            "lxdy", "vtype", "battv", "lx", "dctype", "v_type",
+            "lxdy", "vtype", "battv", "lx", "dctype", "v_type", "jstj",
         ) or ""),
         "TRADEMARK": str(_dm2000_get_value(archive, "trademark", "shangbiao", "sbmc", "pinpai") or ""),
         "LOAD_RESISTANCE": str(_dm2000_get_value(archive, "load_resistance", "fzdz", "fzlkdz", "dw") or ""),
@@ -1784,13 +1784,13 @@ def generate_dm2000_report(payload: DM2000ReportRequest):
             archive,
             "endpoint_voltage", "jzdy", "jzdianyi", "jzdv", "jz",
             "endpoint_v", "vcut", "cutoffv", "cutoff_v",
-            "jzdian", "evy", "minv", "cutv", "jz_dy",
+            "jzdian", "evy", "minv", "cutv", "jz_dy", "zzdy",
         ) or ""),
         "DIS_CONDITION": str(_dm2000_get_value(
             archive,
             "dis_condition", "wd", "fdwd", "hjwd", "wendu",
             "fdtj", "hjtj", "temperature", "temp_c",
-            "temp", "hjt", "qw", "t", "csh",
+            "temp", "hjt", "qw", "t", "csh", "jchj",
         ) or ""),
         "MIN_DURATION": str(_dm2000_get_value(archive, "min_duration", "zdts", "min_ts", "minduration", "zdsc", "zxfdts") or ""),
         **stats,
@@ -1805,6 +1805,50 @@ def generate_dm2000_report(payload: DM2000ReportRequest):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+def _compute_uniform_rate_from_tav(
+    endpoint_voltage_str: str,
+    time_at_volt_map: dict,
+    batys: list,
+) -> Optional[float]:
+    """Compute Uniform Rate = (1 - (Max - Min) / Avg) * 100 at endpoint voltage.
+
+    Uses the time-at-voltage data (ls_vtime/ls_timev) at the endpoint voltage
+    threshold for all active batteries.  Returns a percentage rounded to 2 decimal
+    places, or None when insufficient data is available.
+    """
+    try:
+        ep = float(str(endpoint_voltage_str or "").strip().split()[0])
+    except (IndexError, TypeError, ValueError):
+        return None
+
+    times: list[float] = []
+    for b in batys:
+        rows = time_at_volt_map.get(b) or []
+        for row in rows:
+            sj = row.get("sj") or row.get("SJ")
+            try:
+                if sj is not None and abs(float(sj) - ep) < 0.001:
+                    mins = row.get("minutes") or row.get("MINUTES")
+                    if mins is not None:
+                        f = float(mins)
+                        if not math.isnan(f) and f >= 0:
+                            times.append(f)
+                    break
+            except (TypeError, ValueError):
+                pass
+
+    if len(times) < 2:
+        return None
+
+    max_t = max(times)
+    min_t = min(times)
+    avg_t = sum(times) / len(times)
+    if avg_t <= 0:
+        return None
+
+    return round((1.0 - (max_t - min_t) / avg_t) * 100.0, 2)
 
 
 def _build_preview_workbook(  # noqa: C901
@@ -1878,15 +1922,40 @@ def _build_preview_workbook(  # noqa: C901
         r += 1
 
     # Archive info pairs
+    # Compute Uniform Rate from time-at-voltage data when the stored value is not
+    # already a proper percentage (the raw DB column yfws holds an integer 0-9).
+    _unifrate_raw = archive_fields.get("unifrate") or ""
+    try:
+        _unifrate_val = float(str(_unifrate_raw).replace("%", "").strip())
+        _unifrate_is_pct = _unifrate_val > 1.0
+    except (TypeError, ValueError):
+        _unifrate_val = None
+        _unifrate_is_pct = False
+
+    if not _unifrate_is_pct:
+        _computed = _compute_uniform_rate_from_tav(
+            archive_fields.get("endpoint_voltage") or "",
+            time_at_volt_map,
+            batys,
+        )
+        if _computed is not None:
+            _unifrate_display = f"{_computed:.2f} %"
+        elif _unifrate_raw:
+            _unifrate_display = str(_unifrate_raw)
+        else:
+            _unifrate_display = "-"
+    else:
+        _unifrate_display = f"{_unifrate_val:.2f} %" if _unifrate_val is not None else str(_unifrate_raw)
+
     info_rows_data = [
-        ("Ten lo", archive_fields.get("name") or "-", "Ma archive", archive_fields.get("archname") or "-"),
-        ("Kieu pin", archive_fields.get("dcxh") or "-", "Dieu kien phong", archive_fields.get("fdfs") or "-"),
-        ("Loai dien ap", archive_fields.get("voltage_type") or "-", "Dien tro tai", archive_fields.get("load_resistance") or "-"),
-        ("Nhan hieu", archive_fields.get("trademark") or "-", "Dien ap ket thuc", archive_fields.get("endpoint_voltage") or "-"),
-        ("So seri", archive_fields.get("serialno") or "-", "Dong deu", archive_fields.get("unifrate") or "-"),
-        ("Nha san xuat", archive_fields.get("manufacturer") or "-", "Ngay bat dau", archive_fields.get("startdate") or "-"),
-        ("Ngay san xuat", archive_fields.get("madedate") or "-", "Ngay ket thuc", archive_fields.get("enddate") or "-"),
-        ("Thoi gian toi thieu", archive_fields.get("min_duration") or "-", "Dieu kien nhiet do", archive_fields.get("dis_condition") or "-"),
+        ("Name", archive_fields.get("name") or "-", "Record Name", archive_fields.get("archname") or "-"),
+        ("Type", archive_fields.get("dcxh") or "-", "Discharge Pattern", archive_fields.get("fdfs") or "-"),
+        ("Voltage Type", archive_fields.get("voltage_type") or "-", "Load Resistance", archive_fields.get("load_resistance") or "-"),
+        ("Trademark", archive_fields.get("trademark") or "-", "End-point Voltage", archive_fields.get("endpoint_voltage") or "-"),
+        ("Serial No", archive_fields.get("serialno") or "-", "Uniform Rate", _unifrate_display),
+        ("Manufacturer", archive_fields.get("manufacturer") or "-", "Start Date", archive_fields.get("startdate") or "-"),
+        ("Made date", archive_fields.get("madedate") or "-", "Last Date", archive_fields.get("enddate") or "-"),
+        ("Minimum Duration", archive_fields.get("min_duration") or "-", "Dis-condition", archive_fields.get("dis_condition") or "-"),
     ]
     for left_lbl, left_val, right_lbl, right_val in info_rows_data:
         _set(r, 1, left_lbl, fill=fill_label, align="left")
@@ -1894,6 +1963,11 @@ def _build_preview_workbook(  # noqa: C901
         _set(r, half + 1, right_lbl, fill=fill_label, align="left")
         _set(r, half + 2, right_val, align="left", merge_to=total_cols)
         r += 1
+
+    # Measure Instrument row (full width, italic)
+    _set(r, 1, "Measure Instrument: Type DM2000 Automatic Discharge Test System (V6.22)",
+         italic=True, align="left", merge_to=total_cols)
+    r += 1
 
     # Battery column headers
     _set(r, 1, "", fill=fill_header)
@@ -1968,7 +2042,7 @@ def _build_preview_workbook(  # noqa: C901
         r += 1
 
     # Remarks
-    _set(r, 1, "Ghi chu", fill=fill_label, align="left")
+    _set(r, 1, "Remark", fill=fill_label, align="left")
     _set(r, 2, archive_fields.get("remarks") or "-", align="left", merge_to=total_cols)
 
     # Column widths
@@ -2028,7 +2102,7 @@ def generate_dm2000_simple_report(payload: DM2000SimpleReportRequest):
             archive,
             "voltage_type", "bcdv", "dcdy", "dxy", "edy",
             "nominal_voltage", "dianxin_leixing", "dianxin", "nominal_v",
-            "lxdy", "vtype", "battv", "lx", "dctype", "v_type",
+            "lxdy", "vtype", "battv", "lx", "dctype", "v_type", "jstj",
         ) or ""),
         "trademark": str(_dm2000_get_value(archive, "trademark", "shangbiao", "sbmc", "pinpai") or ""),
         "load_resistance": str(_dm2000_get_value(archive, "load_resistance", "fzdz", "fzlkdz", "dw") or ""),
@@ -2036,13 +2110,13 @@ def generate_dm2000_simple_report(payload: DM2000SimpleReportRequest):
             archive,
             "endpoint_voltage", "jzdy", "jzdianyi", "jzdv", "jz",
             "endpoint_v", "vcut", "cutoffv", "cutoff_v",
-            "jzdian", "evy", "minv", "cutv", "jz_dy",
+            "jzdian", "evy", "minv", "cutv", "jz_dy", "zzdy",
         ) or ""),
         "dis_condition": str(_dm2000_get_value(
             archive,
             "dis_condition", "wd", "fdwd", "hjwd", "wendu",
             "fdtj", "hjtj", "temperature", "temp_c",
-            "temp", "hjt", "qw", "t", "csh",
+            "temp", "hjt", "qw", "t", "csh", "jchj",
         ) or ""),
         "min_duration": str(_dm2000_get_value(archive, "min_duration", "zdts", "min_ts", "minduration", "zdsc", "zxfdts") or ""),
     }
