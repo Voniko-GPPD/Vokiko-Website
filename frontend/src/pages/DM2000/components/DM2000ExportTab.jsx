@@ -466,7 +466,8 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
   const computedUnifRate = useMemo(() => {
     const stored = archiveFields.unifrate || '';
     const storedNum = safeNum(typeof stored === 'string' ? stored.replace('%', '') : stored);
-    const storedIsPct = storedNum != null && storedNum > 1.0;
+    // yfws is stored as a whole integer in [0, 9]; any other value is a percentage
+    const storedIsPct = storedNum != null && !(Number.isInteger(storedNum) && storedNum >= 0 && storedNum <= 9);
 
     if (!storedIsPct) {
       const epRaw = archiveFields.endpoint_voltage || '';

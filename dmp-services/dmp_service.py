@@ -1927,7 +1927,8 @@ def _build_preview_workbook(  # noqa: C901
     _unifrate_raw = archive_fields.get("unifrate") or ""
     try:
         _unifrate_val = float(str(_unifrate_raw).replace("%", "").strip())
-        _unifrate_is_pct = _unifrate_val > 1.0
+        # yfws is stored as a whole integer in [0, 9]; any other value is a percentage
+        _unifrate_is_pct = not (_unifrate_val == int(_unifrate_val) and 0 <= _unifrate_val <= 9)
     except (TypeError, ValueError):
         _unifrate_val = None
         _unifrate_is_pct = False
