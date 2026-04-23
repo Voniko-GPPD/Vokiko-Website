@@ -63,6 +63,17 @@ function buildBatchTree(batches, channelsByBatch, labels) {
   }));
 }
 
+function collectAllParentKeys(nodes) {
+  const keys = [];
+  nodes.forEach((node) => {
+    if (node.children && node.children.length > 0) {
+      keys.push(node.key);
+      keys.push(...collectAllParentKeys(node.children));
+    }
+  });
+  return keys;
+}
+
 function filterTree(nodes, keyword) {
   if (!keyword) return nodes;
   const lowerKeyword = keyword.toLowerCase();
@@ -190,6 +201,12 @@ export default function DMPSidebar({ stationId, onSelect }) {
     clickToLoad: t('dmpClickToLoadChannels'),
   }), [batches, channelsByBatch, t]);
   const filteredTreeData = useMemo(() => filterTree(treeData, searchValue), [treeData, searchValue]);
+
+  // Auto-expand all matching nodes when a search keyword is active
+  useEffect(() => {
+    if (!searchValue) return;
+    setExpandedKeys(collectAllParentKeys(filteredTreeData));
+  }, [searchValue, filteredTreeData]);
 
   const handleExpand = async (nextExpandedKeys, info) => {
     setExpandedKeys(nextExpandedKeys);
