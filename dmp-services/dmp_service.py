@@ -34,11 +34,11 @@ DM2000_DATA_DIR: str = os.environ.get("DM2000_DATA_DIR", r"D:\DM2000\dmdatabase"
 DM2000_TEMPLATES_DIR: str = os.environ.get("DM2000_TEMPLATES_DIR", "./dm2000_templates")
 # Local cache directory: persistent copies of dmdata_ls.mdb are kept here so that
 # every request reads from the cached copy instead of making a new shadow copy.
-DM2000_CACHE_DIR: str = os.environ.get("DM2000_CACHE_DIR", "./dm2000_cache")
+DM2000_CACHE_DIR: str = os.environ.get("DM2000_CACHE_DIR", "../backend/data/dm2000_cache")
 # Local cache directory: persistent copy of DMPDATA.mdb is kept here so that
 # every batch/channel request reads from the cached copy instead of making a
 # new shadow copy each time.
-DMPDATA_CACHE_DIR: str = os.environ.get("DMPDATA_CACHE_DIR", "./dmpdata_cache")
+DMPDATA_CACHE_DIR: str = os.environ.get("DMPDATA_CACHE_DIR", "../backend/data/dmdata_cache")
 # Configurable company name shown in reports (e.g. "Asia Matsushita Electric Pte Ltd").
 DM2000_COMPANY_NAME: str = os.environ.get("DM2000_COMPANY_NAME", "")
 WATCH_INTERVAL_SECONDS: int = 5
