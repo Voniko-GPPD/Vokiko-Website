@@ -41,9 +41,9 @@ echo [OK] Python da san sang.
 :: -------------------------------------------------------
 :: Buoc 2: Tao venv neu chua co
 :: -------------------------------------------------------
-if not exist "%~dp0hardware-services\venv" (
+if not exist "%~dp0venv" (
     echo [INSTALL] Tao moi truong ao Python...
-    python -m venv "%~dp0hardware-services\venv"
+    python -m venv "%~dp0venv"
     if errorlevel 1 (
         echo [LOI] Khong tao duoc venv.
         pause
@@ -55,10 +55,10 @@ if not exist "%~dp0hardware-services\venv" (
 :: -------------------------------------------------------
 :: Buoc 3: Kich hoat venv va cai thu vien
 :: -------------------------------------------------------
-call "%~dp0hardware-services\venv\Scripts\activate.bat"
+call "%~dp0venv\Scripts\activate.bat"
 
 echo [INSTALL] Kiem tra / cap nhat thu vien Python...
-pip install -r "%~dp0hardware-services\requirements.txt" --quiet
+pip install -r "%~dp0requirements.txt" --quiet
 if errorlevel 1 (
     echo [LOI] Cai dat thu vien that bai.
     pause
@@ -105,14 +105,14 @@ echo [PM2] Dung process cu neu co...
 call pm2 delete battery-service >nul 2>&1
 
 echo [PM2] Khoi dong Battery Service...
-call pm2 start "%~dp0hardware-services\venv\Scripts\pythonw.exe" ^
+call pm2 start "%~dp0venv\Scripts\pythonw.exe" ^
     --name "battery-service" ^
     --restart-delay 3000 ^
     --max-restarts 10 ^
     -- -m uvicorn battery_service:app ^
     --host 0.0.0.0 ^
     --port 8765 ^
-    --app-dir "%~dp0hardware-services"
+    --app-dir "%~dp0"
 
 :: Luu PM2 startup
 call pm2 save

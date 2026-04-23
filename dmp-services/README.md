@@ -4,7 +4,7 @@
 `dmp_service.py` chạy trên máy Windows cài phần mềm **Ee-Share DMP**. Service đọc file `.mdb` local (qua pyodbc + shadow copy), tự đăng ký về server Voniko trung tâm, và cho phép truy cập dữ liệu qua web interface.
 
 > **Lưu ý:** Đây là service RIÊNG BIỆT với `hardware-services/battery_service.py`.  
-> Không chạy `start_hardware.bat` trên máy DMP. Dùng `start_dmp.bat`.
+> Không chạy `hardware-services/start_hardware.bat` trên máy DMP. Dùng `dmp-services/start_dmp.bat`.
 
 ## Yêu cầu
 - Windows (bắt buộc — cần MS Access ODBC driver)
@@ -21,7 +21,7 @@ pip install -r requirements.txt
 ```
 
 ## Cấu hình & Chạy
-Chỉnh `start_dmp.bat` (2 dòng đầu):
+Chỉnh `start_dmp.bat` (2 dòng đầu — file này nằm trong thư mục `dmp-services/`):
 
 | Biến | Mô tả | Ví dụ |
 |------|-------|-------|
@@ -35,7 +35,7 @@ Chỉnh `start_dmp.bat` (2 dòng đầu):
 | | `hardware-services/` | `dmp-services/` |
 |---|---|---|
 | Chạy trên | Máy trạm đo pin (IT8511A+) | Máy cài DMP software |
-| Khởi động bằng | `start_hardware.bat` | `start_dmp.bat` |
+| Khởi động bằng | `hardware-services/start_hardware.bat` | `dmp-services/start_dmp.bat` |
 | Đọc | Hardware serial/VISA | File .mdb (Access DB) |
 | Đăng ký về | `/api/battery/register` | `/api/dmp/register` |
 | Port mặc định | 8765 | 8766 |

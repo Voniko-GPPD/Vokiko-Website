@@ -38,9 +38,9 @@ if errorlevel 1 (
 echo [OK] Python da san sang.
 
 :: Buoc 2: Tao venv neu chua co
-if not exist "%~dp0dmp-services\venv" (
+if not exist "%~dp0venv" (
     echo [INSTALL] Tao moi truong ao Python...
-    python -m venv "%~dp0dmp-services\venv"
+    python -m venv "%~dp0venv"
     if errorlevel 1 (
         echo [LOI] Khong tao duoc venv.
         pause
@@ -50,10 +50,10 @@ if not exist "%~dp0dmp-services\venv" (
 )
 
 :: Buoc 3: Kich hoat venv va cai thu vien
-call "%~dp0dmp-services\venv\Scripts\activate.bat"
+call "%~dp0venv\Scripts\activate.bat"
 
 echo [INSTALL] Kiem tra / cap nhat thu vien Python...
-pip install -r "%~dp0dmp-services\requirements.txt" --quiet
+pip install -r "%~dp0requirements.txt" --quiet
 if errorlevel 1 (
     echo [LOI] Cai dat thu vien that bai.
     pause
@@ -93,19 +93,19 @@ call pm2 delete dmp-service >nul 2>&1
 call pm2 delete dmp-watchdog >nul 2>&1
 
 echo [PM2] Khoi dong DMP Service...
-call pm2 start "%~dp0dmp-services\venv\Scripts\pythonw.exe" ^
+call pm2 start "%~dp0venv\Scripts\pythonw.exe" ^
     --name "dmp-service" ^
     --restart-delay 3000 ^
     -- -m uvicorn dmp_service:app ^
     --host 0.0.0.0 ^
     --port %DMP_STATION_PORT% ^
-    --app-dir "%~dp0dmp-services"
+    --app-dir "%~dp0"
 
 echo [PM2] Khoi dong DMP Watchdog (tu dong khoi dong lai khi server bi treo)...
-call pm2 start "%~dp0dmp-services\venv\Scripts\python.exe" ^
+call pm2 start "%~dp0venv\Scripts\python.exe" ^
     --name "dmp-watchdog" ^
     --restart-delay 5000 ^
-    -- "%~dp0dmp-services\dmp_watchdog.py"
+    -- "%~dp0dmp_watchdog.py"
 
 call pm2 save
 

@@ -12,7 +12,14 @@ backend/.env
 *.env.local
 
 # Database and uploaded files
-backend/data/
+backend/data/avatars/
+backend/data/logs/
+backend/data/backups/
+backend/data/*.db
+backend/data/*.db-shm
+backend/data/*.db-wal
+backend/data/dm2000_cache/*.mdb
+backend/data/dmpdata_cache/*.mdb
 backend/uploads/
 
 # Logs
@@ -33,10 +40,6 @@ desktop.ini
 # Temp
 tmp/
 temp/
-data/plc_control.db
-data/plc_control.db-shm
-data/plc_control.db-wal
-data/backups/
 
 # Downloaded font assets (restored by `npm install` postinstall script)
 backend/src/assets/fonts/*.ttf
@@ -46,6 +49,7 @@ backend/src/assets/fonts/*.otf
 
 # Virtual environment
 hardware-services/venv/
+dmp-services/venv/
 
 # Python bytecode cache
 __pycache__/
