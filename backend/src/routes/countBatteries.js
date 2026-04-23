@@ -18,6 +18,7 @@ const logger = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
 
 const PYTHON_BASE = process.env.COUNT_BATTERIES_URL || 'http://127.0.0.1:8001';
+const PREDICT_TIMEOUT_MS = parseInt(process.env.COUNT_BATTERIES_TIMEOUT_MS || '120000', 10);
 
 /** Build proxy headers that carry user identity to the Python service */
 function userHeaders(req) {
@@ -72,7 +73,7 @@ router.post('/predict', upload.single('file'), async (req, res) => {
         ...form.getHeaders(),
         ...userHeaders(req),
       },
-      timeout: 120000, // AI inference can take a while
+      timeout: PREDICT_TIMEOUT_MS, // AI inference can take a while
     });
     res.json(result.data);
   } catch (e) {
@@ -162,8 +163,13 @@ router.delete('/history/batch', async (req, res) => {
 // DELETE /history/:id
 // ---------------------------------------------------------------------------
 router.delete('/history/:id', async (req, res) => {
+  // Validate id is a positive integer to prevent path traversal
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid record ID' });
+  }
   try {
-    const result = await axios.delete(`${PYTHON_BASE}/history/${req.params.id}`, {
+    const result = await axios.delete(`${PYTHON_BASE}/history/${id}`, {
       headers: userHeaders(req),
     });
     res.json(result.data);

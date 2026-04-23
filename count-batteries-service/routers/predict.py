@@ -31,9 +31,7 @@ async def predict(
     db: Session = Depends(get_db),
 ):
     """Upload an image and count batteries using YOLO/ONNX AI."""
-    po_number = po_number.strip() if po_number else None
-    if po_number == "":
-        po_number = None
+    po_number = po_number.strip() or None if po_number else None
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")

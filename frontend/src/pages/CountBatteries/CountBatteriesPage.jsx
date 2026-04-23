@@ -552,7 +552,7 @@ export default function CountBatteriesPage() {
                       />
                     </Col>
                   )}
-                  <Col xs={24} sm={12} lg={isAdmin ? 9 : 9}>
+                  <Col xs={24} sm={12} lg={isAdmin ? 9 : 13}>
                     <Space wrap>
                       <Button icon={<ReloadOutlined />} onClick={loadHistory}>
                         {t('refresh')}
