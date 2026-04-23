@@ -460,6 +460,46 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
   const [fcvMax, fcvMin, fcvAvg] = rowAgg((b) => statsMap[b]?.FCV ?? getBatteryField(batteryParams[b], 'fcv', 'FCV'), 3);
   const [sotMax, sotMin, sotAvg] = rowAgg((b) => safeNum(getSot(b)), 3);
 
+  /** Compute Uniform Rate = (1 - (Max - Min) / Avg) × 100% at endpoint voltage.
+   *  Falls back to the stored archiveFields.unifrate when time data is unavailable
+   *  or when the stored value is already a percentage (> 1 after stripping %). */
+  const computedUnifRate = useMemo(() => {
+    const stored = archiveFields.unifrate || '';
+    const storedNum = safeNum(typeof stored === 'string' ? stored.replace('%', '') : stored);
+    // yfws is stored as a whole integer in [0, 9]; any other value is a percentage
+    const storedIsPct = storedNum != null && !(Number.isInteger(storedNum) && storedNum >= 0 && storedNum <= 9);
+
+    if (!storedIsPct) {
+      const epRaw = archiveFields.endpoint_voltage || '';
+      const ep = safeNum(typeof epRaw === 'string' ? epRaw.split(' ')[0] : epRaw);
+      if (ep != null) {
+        const times = previewBatys.map((b) => {
+          const rows = timeAtVoltMap[b];
+          if (!rows) return null;
+          const row = rows.find((r) => {
+            const sj = safeNum(r.sj ?? r.SJ);
+            return sj != null && Math.abs(sj - ep) < 0.001;
+          });
+          if (!row) return null;
+          const val = safeNum(row.minutes ?? row.MINUTES);
+          return val != null && val >= 0 ? val : null;
+        }).filter((v) => v != null);
+
+        if (times.length >= 2) {
+          const maxT = Math.max(...times);
+          const minT = Math.min(...times);
+          const avgT = times.reduce((s, v) => s + v, 0) / times.length;
+          if (avgT > 0) {
+            return `${((1 - (maxT - minT) / avgT) * 100).toFixed(2)} %`;
+          }
+        }
+      }
+      return stored || '-';
+    }
+    return storedNum != null ? `${storedNum.toFixed(2)} %` : stored;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archiveFields.unifrate, archiveFields.endpoint_voltage, previewBatys, timeAtVoltMap]);
+
   return (
     <div style={{ overflowX: 'auto', fontFamily: 'Arial, sans-serif' }}>
       <table style={{ borderCollapse: 'collapse', minWidth: 600 }}>
@@ -507,7 +547,7 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
             <td style={labelStyle}>{t('dm2000SerialNo')}</td>
             <td colSpan={Math.floor((numCols - 1) / 2)} style={cellStyle}>{archiveFields.serialno || '-'}</td>
             <td style={labelStyle}>{t('dm2000UnifRate')}</td>
-            <td colSpan={numCols - Math.floor((numCols - 1) / 2) - 2} style={cellStyle}>{archiveFields.unifrate || '-'}</td>
+            <td colSpan={numCols - Math.floor((numCols - 1) / 2) - 2} style={cellStyle}>{computedUnifRate}</td>
           </tr>
           <tr>
             <td style={labelStyle}>{t('dm2000Manufacturer')}</td>
@@ -526,6 +566,12 @@ function ReportPreview({ archiveFields, companyName, statsMap, timeAtVoltMap, ba
             <td colSpan={Math.floor((numCols - 1) / 2)} style={cellStyle}>{archiveFields.min_duration || '-'}</td>
             <td style={labelStyle}>{t('dm2000Temperature')}</td>
             <td colSpan={numCols - Math.floor((numCols - 1) / 2) - 2} style={cellStyle}>{archiveFields.dis_condition || '-'}</td>
+          </tr>
+          {/* Measure Instrument row */}
+          <tr>
+            <td colSpan={numCols} style={{ ...cellStyle, fontStyle: 'italic' }}>
+              {`${t('dm2000MeasureInstrument')}: Type DM2000 Automatic Discharge Test System (V6.22)`}
+            </td>
           </tr>
           {/* Battery column headers */}
           <tr>

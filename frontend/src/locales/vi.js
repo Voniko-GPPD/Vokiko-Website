@@ -566,4 +566,5 @@ export default {
   dm2000EndpointVoltage: 'Điện áp kết thúc',
   dm2000Temperature: 'Điều kiện nhiệt độ',
   dm2000MinDuration: 'Thời gian tối thiểu',
+  dm2000MeasureInstrument: 'Thiết bị đo lường',
 };
