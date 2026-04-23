@@ -161,7 +161,7 @@ export default function BatteryDMPPage() {
             key: 'dmp',
             label: (
               <span>
-                <ExperimentOutlined />
+                <ExperimentOutlined style={{ marginRight: 6 }} />
                 {t('dmpBridgeTitle')}
               </span>
             ),
@@ -171,7 +171,7 @@ export default function BatteryDMPPage() {
             key: 'dm2000',
             label: (
               <span>
-                <DatabaseOutlined />
+                <DatabaseOutlined style={{ marginRight: 6 }} />
                 {t('dm2000Title')}
               </span>
             ),
