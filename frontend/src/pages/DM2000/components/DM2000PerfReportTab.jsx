@@ -395,25 +395,14 @@ export default function DM2000PerfReportTab({ stationId }) {
             description={t('dm2000PerfNoEntries')}
           />
         ) : (
-          <Space direction="vertical" size={8} style={{ width: '100%' }}>
-            <Table
-              size="small"
-              rowKey="key"
-              columns={entryColumns}
-              dataSource={entries}
-              pagination={false}
-              scroll={{ x: 'max-content' }}
-            />
-            <Button
-              type="primary"
-              icon={<DownloadOutlined />}
-              loading={downloading}
-              onClick={handleDownload}
-              style={{ marginTop: 4 }}
-            >
-              {downloading ? t('dm2000PerfDownloading') : t('dm2000PerfDownload')}
-            </Button>
-          </Space>
+          <Table
+            size="small"
+            rowKey="key"
+            columns={entryColumns}
+            dataSource={entries}
+            pagination={false}
+            scroll={{ x: 'max-content' }}
+          />
         )}
       </Card>
     </Space>
