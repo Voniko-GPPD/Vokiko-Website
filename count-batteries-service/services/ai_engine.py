@@ -11,6 +11,7 @@ import base64
 from datetime import datetime
 import os
 import time
+import threading
 
 # Try to import ONNX Runtime with GPU support
 ONNX_AVAILABLE = False
@@ -56,6 +57,7 @@ class AIEngine:
     _session = None  # ONNX Runtime session
     _use_onnx = False
     _load_error = None  # Last model load error message (None when loaded successfully)
+    _lock = threading.Lock()  # Guards model load/reload and inference
     
     # Preprocessing configuration
     TARGET_SIZE = 1280  # Updated to match retrained model at 1280px
@@ -102,21 +104,28 @@ class AIEngine:
     
     def __init__(self):
         if self._session is None and self._model is None:
-            self._load_model()
+            with self.__class__._lock:
+                if self._session is None and self._model is None:
+                    self._load_model()
 
     def reload_model(self):
         """Force reload the model (useful for hot-reload without service restart)."""
-        self._session = None
-        self._model = None
-        self._use_onnx = False
-        self._load_error = None
-        self.__class__._load_error = None
-        self._load_model()
+        with self.__class__._lock:
+            self.__class__._session = None
+            self.__class__._model = None
+            self.__class__._use_onnx = False
+            self.__class__._load_error = None
+            self._load_model()
 
     @property
     def is_model_loaded(self) -> bool:
         """Return True only when a real AI model (ONNX or YOLO) is loaded."""
         return self._session is not None or self._model is not None
+
+    @property
+    def load_error(self) -> Optional[str]:
+        """Return the last model load error, or None if loaded successfully."""
+        return self.__class__._load_error
     
     # ==================== ADAPTIVE IMAGE ANALYSIS ====================
     
@@ -182,6 +191,7 @@ class AIEngine:
             models_dir = Path(__file__).parent.parent / "models"
         onnx_path = models_dir / "best.onnx"
         pt_path = models_dir / "best.pt"
+        load_errors = []
         
         # Try ONNX first (faster)
         if ONNX_AVAILABLE and onnx_path.exists():
@@ -236,7 +246,7 @@ class AIEngine:
             except Exception as e:
                 onnx_err = str(e)
                 print(f"Error loading ONNX model: {onnx_err}")
-                self.__class__._load_error = f"ONNX load failed: {onnx_err}"
+                load_errors.append(f"ONNX load failed: {onnx_err}")
                 self._session = None
         
         # Fallback to YOLO (.pt model) – try even when onnxruntime is installed
@@ -251,16 +261,14 @@ class AIEngine:
             except Exception as e:
                 yolo_err = str(e)
                 print(f"Error loading YOLO model: {yolo_err}")
-                self.__class__._load_error = (
-                    (self.__class__._load_error + " | " if self.__class__._load_error else "")
-                    + f"YOLO load failed: {yolo_err}"
-                )
+                load_errors.append(f"YOLO load failed: {yolo_err}")
                 self._model = None
         
-        if not self.__class__._load_error:
-            self.__class__._load_error = (
+        if not load_errors:
+            load_errors.append(
                 f"No model file found. Expected best.onnx or best.pt in: {models_dir}"
             )
+        self.__class__._load_error = " | ".join(load_errors)
         print(f"No model available. {self.__class__._load_error}")
     
     # ==================== ONNX INFERENCE ====================
