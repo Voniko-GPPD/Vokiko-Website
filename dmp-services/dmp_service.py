@@ -2128,13 +2128,13 @@ def _build_preview_workbook(  # noqa: C901
         series = _ChartSeries(yvalues, xvalues)
         series.marker.symbol = "none"
         series.graphicalProperties.line.solidFill = "000000"
-        series.graphicalProperties.line.width = 19050  # 1.5 pt in EMUs
+        series.graphicalProperties.line.width = 19050  # 1.5 pt (19050 EMUs = 1.5 × 12700)
         chart.series.append(series)
         chart.width = 15
         chart.height = 10
 
-        # Place the chart below the data table, starting from column A.
-        ws.add_chart(chart, f"A{r + 2}")
+        # Place the chart below both the Remarks row and the hidden chart data rows.
+        ws.add_chart(chart, f"A{chart_data_end + 2}")
 
     # Column widths
     ws.column_dimensions["A"].width = 22
