@@ -152,15 +152,22 @@ export default function DMPChartTab({ stationId, selection }) {
           setLoading(false);
           return;
         }
+        const failedChannels = [];
         return Promise.all(
           channels.map((ch) =>
             fetchTelemetry(stationId, ch.cdmc, ch.baty)
               .then((rows) => ({ channel: ch.baty, rows }))
-              .catch(() => ({ channel: ch.baty, rows: [] }))
+              .catch((err) => {
+                failedChannels.push({ channel: ch.baty, reason: err.message || 'Unknown error' });
+                return { channel: ch.baty, rows: [] };
+              })
           )
         ).then((results) => {
           if (!mounted) return;
           setBatchChannelTelemetry(results);
+          if (failedChannels.length) {
+            setError(`Failed to load channels: ${failedChannels.map((f) => `CH${f.channel}`).join(', ')}`);
+          }
           setLoading(false);
         });
       })
@@ -192,7 +199,7 @@ export default function DMPChartTab({ stationId, selection }) {
   const batchChartData = useMemo(() => {
     if (!batchChannelTelemetry.length) return [];
     const lengths = batchChannelTelemetry.map((ch) => ch.rows.length);
-    const minLen = Math.min(...lengths);
+    const minLen = lengths.length ? Math.min(...lengths) : 0;
     if (minLen === 0) return [];
     return Array.from({ length: minLen }, (_, i) => {
       const point = {
