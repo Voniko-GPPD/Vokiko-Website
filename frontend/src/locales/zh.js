@@ -597,4 +597,5 @@ export default {
   dm2000PerfFdfs: '放电模式(fdfs)',
   dm2000PerfStartDate: '开始日期',
   dm2000PerfDuplicateEntry: '档案 {archname} 类型 {type} 已在列表中',
+  dm2000PerfBatysTooltip: '留空则使用所有有数据的通道',
 };

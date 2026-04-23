@@ -597,4 +597,5 @@ export default {
   dm2000PerfFdfs: 'Discharge pattern (fdfs)',
   dm2000PerfStartDate: 'Start date',
   dm2000PerfDuplicateEntry: 'Archive {archname} with type {type} is already in the list',
+  dm2000PerfBatysTooltip: 'Leave empty to use all channels with data',
 };

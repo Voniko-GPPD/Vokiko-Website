@@ -597,4 +597,5 @@ export default {
   dm2000PerfFdfs: 'Chế độ phóng (fdfs)',
   dm2000PerfStartDate: 'Ngày bắt đầu',
   dm2000PerfDuplicateEntry: 'Archive {archname} với loại {type} đã có trong danh sách',
+  dm2000PerfBatysTooltip: 'Để trống để dùng tất cả kênh có dữ liệu',
 };

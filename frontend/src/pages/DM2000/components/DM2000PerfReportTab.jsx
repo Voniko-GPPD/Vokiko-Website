@@ -33,6 +33,10 @@ const dateFormat = 'YYYY-MM-DD';
 
 const BATTERY_TYPES = ['HP', 'UD', 'UD+'];
 
+/** Auto-incrementing counter used to produce stable unique entry keys. */
+let _entryCounter = 0;
+const nextKey = () => { _entryCounter += 1; return `entry_${_entryCounter}`; };
+
 /** Parse a range string like "1-4" or "1,2,3,4" into an array of ints. */
 function parseBatys(str) {
   if (!str || !str.trim()) return [];
@@ -106,7 +110,7 @@ export default function DM2000PerfReportTab({ stationId }) {
   const addArchivesToReport = (records, defaultType = 'HP') => {
     const toAdd = [];
     records.forEach((record) => {
-      const key = `${record.archname}__${defaultType}__${Date.now()}_${Math.random()}`;
+      const key = nextKey();
       toAdd.push({
         key,
         archname: record.archname,
@@ -247,7 +251,7 @@ export default function DM2000PerfReportTab({ stationId }) {
       key: 'batysStr',
       width: 180,
       render: (_, e) => (
-        <Tooltip title={t('dm2000PerfAllBatys') + ' if empty'}>
+        <Tooltip title={t('dm2000PerfBatysTooltip')}>
           <Input
             size="small"
             placeholder={t('dm2000PerfAllBatys')}

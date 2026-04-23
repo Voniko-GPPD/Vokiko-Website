@@ -42,6 +42,8 @@ DMPDATA_CACHE_DIR: str = os.environ.get("DMPDATA_CACHE_DIR", "./dmpdata_cache")
 # Configurable company name shown in reports (e.g. "Asia Matsushita Electric Pte Ltd").
 DM2000_COMPANY_NAME: str = os.environ.get("DM2000_COMPANY_NAME", "")
 WATCH_INTERVAL_SECONDS: int = 5
+# Maximum valid DM2000 battery channel number (channels are numbered 1..MAX_BATTERY_NUMBER)
+MAX_BATTERY_NUMBER: int = 99
 
 _WATCH_LOCK = threading.Lock()
 _ACCESS_QUERY_LOCK = threading.Semaphore(3)
@@ -2822,7 +2824,7 @@ def generate_dm2000_perf_report(payload: PerfReportRequest):  # noqa: C901
             sheet_name = " ".join(parts)[:31] if parts else entry.archname[:31]
 
         # Resolve battery list
-        batys = [b for b in entry.batys if isinstance(b, int) and 1 <= b <= 99]
+        batys = [b for b in entry.batys if isinstance(b, int) and 1 <= b <= MAX_BATTERY_NUMBER]
         if not batys:
             batys = _get_batys_for_archive(entry.archname)
         if not batys:
