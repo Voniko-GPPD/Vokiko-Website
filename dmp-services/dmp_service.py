@@ -1966,15 +1966,6 @@ def _build_preview_workbook(  # noqa: C901
     else:
         _unifrate_display = f"{_unifrate_val:.2f} %" if _unifrate_val is not None else str(_unifrate_raw)
 
-    def _append_unit(val: str, unit: str) -> str:
-        """Append a physical unit to a value string if not already present."""
-        if not val or val == "-":
-            return val or "-"
-        val_stripped = val.strip()
-        if val_stripped.lower().endswith(unit.lower()):
-            return val_stripped
-        return f"{val_stripped} {unit}"
-
     _voltage_type_val = archive_fields.get("voltage_type") or "-"
     _load_resistance_val = _append_unit(archive_fields.get("load_resistance") or "", "ohm")
     _endpoint_voltage_val = _append_unit(archive_fields.get("endpoint_voltage") or "", "V")
