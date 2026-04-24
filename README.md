@@ -260,7 +260,7 @@ uvicorn main:app --host 127.0.0.1 --port 8001
 
 | Vai trò | Username | Password |
 |---|---|---|
-| Admin | `admin` | `Admin@123456` |
+| Admin | `admin` | Xem giá trị `ADMIN_PASSWORD` trong `.env` |
 
 > ⚠️ **Đổi mật khẩu ngay sau lần đăng nhập đầu tiên!**
 
@@ -466,7 +466,7 @@ BACKUP_DIR=./data/backups
 
 # Admin mặc định (đổi sau lần đăng nhập đầu tiên)
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=Admin@123456
+ADMIN_PASSWORD=<set-a-strong-password>
 
 # Python Services
 BATTERY_SERVICE_URL=http://127.0.0.1:8765

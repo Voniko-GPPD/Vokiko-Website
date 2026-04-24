@@ -783,7 +783,7 @@ class AIEngine:
         
         if self._use_onnx and self._session:
             # Batch processing for ONNX
-            all_detections = self._sahi_batch_onnx(image, slices, confidence)
+            all_detections = self._sahi_process_slices_onnx(image, slices, confidence)
         else:
             # Sequential processing for YOLO fallback
             for x1, y1, x2, y2 in slices:
@@ -818,7 +818,7 @@ class AIEngine:
         
         return len(filtered), filtered
     
-    def _sahi_batch_onnx(self, image: np.ndarray, slices: List[Tuple[int, int, int, int]], 
+    def _sahi_process_slices_onnx(self, image: np.ndarray, slices: List[Tuple[int, int, int, int]], 
                          confidence: float) -> List[dict]:
         """Process SAHI slices one-by-one using ONNX Runtime.
 
