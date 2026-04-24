@@ -26,7 +26,7 @@ function userHeaders(req) {
     'x-user-id': req.user.id,
     'x-username': req.user.username,
     'x-user-role': req.user.role,
-    'x-display-name': req.user.display_name || req.user.username,
+    'x-display-name': encodeURIComponent(req.user.display_name || req.user.username),
   };
 }
 
